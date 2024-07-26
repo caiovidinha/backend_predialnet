@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client")
-const { checkUser } = require("../models/auth")
+const { checkUser, checkUserApp } = require("../models/auth")
 const { z } = require('zod')
+const { status } = require("express/lib/response")
 
 const prisma = new PrismaClient()
 
@@ -24,14 +25,18 @@ newUser = async(req, res) => {
     //checkUser
     const userStatus = await checkUser(userCredential)
 
-    if(!userStatus)return res.status(400).json('Não é cliente predialnet')
-
     //checkAppDatabase
+    const userStatusApp = await checkUserApp(userCredential)
+
     //generatePassword
     //createUser (db)
-    users.push({userCredential, password:''})
+
+    const infos = {
+        status: userStatus,
+        statusApp: userStatusApp
+    }
     
-    return res.status(201).json(userStatus)
+    return res.status(201).json(infos)
 }
 
 module.exports = {
