@@ -1,0 +1,13 @@
+- db auth
+    - numero cliente
+    - cpf
+    - senha
+
+- db predialnet
+    - numero cliente
+    - cpf
+    - plano
+    - endereço
+    - email
+    - faturas (lista)
+    - status da fatura atual
