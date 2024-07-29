@@ -1,5 +1,5 @@
 const { PrismaClient } = require("@prisma/client")
-const { checkUser, checkUserApp, generatePassword, passwordExistsInDatabase } = require("../models/auth")
+const { checkUser, checkUserApp, generatePassword, passwordExistsInDatabase,censorEmail } = require("../models/auth")
 const { z } = require('zod')
 const { status } = require("express/lib/response")
 
@@ -24,11 +24,18 @@ newUser = async(req, res) => {
     const { userCredential } = req.body
     //checkUser
     const userStatusDBPredial = await checkUser(userCredential)
-    if(userStatusDBPredial.error) return res.status(404).json(userStatusDBPredial.error)
+    
+    if(userStatusDBPredial.error) {
+        console.log(userStatusDBPredial.error)
+        return res.status(404).json(userStatusDBPredial.error)
+    }
 
     //checkAppDatabase
     const userStatusApp = await checkUserApp(userCredential)
-    if(userStatusApp.error) return res.status(404).json(userStatusApp.error)
+    if(userStatusApp.error) {
+        console.log(userStatusApp.error)
+        return res.status(404).json(userStatusApp.error)
+    }
     
     //generatePassword
     let newPassword
@@ -41,17 +48,17 @@ newUser = async(req, res) => {
         statusDBPredial: userStatusDBPredial,
         statusApp: userStatusApp,
         password: newPassword,
+        email: userStatusDBPredial.email,
         registroDB: {
             cpf: userStatusDBPredial.cpf,
             numeroCliente: userStatusDBPredial.numeroCliente,
-            password: newPassword
+            password: newPassword,
         },
         status: "Conta criada com sucesso"
     }
 
     //TODO: enviar senha por email/sms
-    
-    return res.status(201).json(infos.status)
+    return res.status(201).json(censorEmail(infos.email))
 }
 
 module.exports = {

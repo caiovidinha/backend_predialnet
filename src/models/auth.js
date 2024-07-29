@@ -9,10 +9,12 @@ const instance = axios.create({
 
 const standardUser = [{
     cpf: '19242536741',
-    cNumber: '123456'
+    cNumber: '123456',
+    email: 'caiomdavidinha@gmail.com'
 },{    
     cpf: '19242536742',
-    cNumber: '012345'
+    cNumber: '012345',
+    email: 'caiovidinha@gmail.com'
 }]
 
 const standardUserApp = [{
@@ -32,14 +34,16 @@ const checkUser = async(userCredential) => {
                 
                 user = {
                     cpf: standardUser[i].cpf,
-                    cNumber: standardUser[i].cNumber
+                    cNumber: standardUser[i].cNumber,
+                    email: standardUser[i].email,
                 }
             }
         }
             if(user) return {
                 status: 'É cliente (CN)',
                 cpf: user.cpf,
-                numeroCliente: user.cNumber
+                numeroCliente: user.cNumber,
+                email: user.email
             }
             return {error: 'Número do cliente não existe'}
         }
@@ -50,14 +54,16 @@ const checkUser = async(userCredential) => {
                 
                 user = {
                     cpf: standardUser[i].cpf,
-                    cNumber: standardUser[i].cNumber
+                    cNumber: standardUser[i].cNumber,
+                    email: standardUser[i].email
                 }
             }
         }
     if(user) return {
         status: 'É cliente (CPF)',
         cpf: user.cpf,
-        numeroCliente: user.cNumber
+        numeroCliente: user.cNumber,
+        email:user.email
     }
     return {error: 'CPF Não existe'}
 }
@@ -88,12 +94,14 @@ const checkUserApp = async(userCredential)=>{
                 user = {
                     cpf: standardUserApp[i].cpf,
                     cNumber: standardUserApp[i].cNumber,
-                    password: standardUserApp[i].password
+                    password: standardUserApp[i].password,
                 }
             }
         }
     if(user) return {error:`(CPF) Usuário já possui conta.`}
-    return 'Criar senha'
+    return {
+        status: 'Criar senha'
+    }
 }
 
 const generatePassword = () => {
@@ -143,10 +151,17 @@ const passwordExistsInDatabase = (password) => {
     return false
 }
 
+const censorEmail = (email) => {
+    const [localPart, domain] = email.split('@')
+    const censoredLocalPart =  localPart.slice(0,3) + '*'.repeat(localPart.length - 4) + localPart.slice(-1)
+    return `${censoredLocalPart}@${domain}`
+  }
+
 
 module.exports = {
     checkUser,
     checkUserApp,
     generatePassword,
-    passwordExistsInDatabase
+    passwordExistsInDatabase,
+    censorEmail
 }
