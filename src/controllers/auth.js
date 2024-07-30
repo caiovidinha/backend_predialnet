@@ -1,5 +1,5 @@
 const { PrismaClient } = require("@prisma/client")
-const { checkUser, checkUserApp, generatePassword, passwordExistsInDatabase,censorEmail } = require("../models/auth")
+const { checkUser, checkUserApp, generatePassword, passwordExistsInDatabase, censorEmail, validatePassword, createToken } = require("../models/auth")
 const { z } = require('zod')
 const { status } = require("express/lib/response")
 
@@ -9,7 +9,7 @@ getOk = async(request, response) => {
     return response.status(200).json({pong: "true"})
 }
 
-const users = []
+
 newUser = async(req, res) => {
 
     const newUserSchema = z.object({
@@ -61,8 +61,37 @@ newUser = async(req, res) => {
     return res.status(201).json(censorEmail(infos.email))
 }
 
+login = async (req, res) => {
+    const loginSchema = z.object({
+        credential: z.string(),
+        password: z.string()
+    })
+    const body = loginSchema.safeParse(req.body)
+    if(!body.success) return res.status(400).json({error: 'Dados inválidos'})
+
+
+    const userStatusDBPredial = await checkUser(body.data.credential)
+    
+    if(userStatusDBPredial.error) {
+        return res.status(403).json(userStatusDBPredial.error)
+    }
+
+    const userStatusApp = await checkUserApp(body.data.credential)
+    if(!userStatusApp.error) {
+        return res.status(403).json({error: "Conta não existe no app"})
+    }
+
+    if(validatePassword(body.data)) {
+        return res.status(201).json({
+            token: createToken()
+        })
+    }
+    return res.status(403).json({error: "Senha inválida"})
+}
+
 module.exports = {
     getOk,
-    newUser
+    newUser,
+    login
 }
 

@@ -1,11 +1,14 @@
 const axios = require('axios')
 const https = require('https')
 const dotenv = require('dotenv').config()
+const jwt = require('jsonwebtoken')
 const instance = axios.create({
     httpsAgent: new https.Agent({
         rejectUnauthorized: false
     })
 })
+
+const SECRET = 'predialnet'
 
 const standardUser = [{
     cpf: '19242536741',
@@ -17,13 +20,55 @@ const standardUser = [{
     email: 'caiovidinha@gmail.com'
 }]
 
-const standardUserApp = [{
-    cpf: '19242536742',
-    cNumber: '012345',
-    password: '101299@Cc'
-}]
+const standardUserApp = [
+    {
+        cpf: '19242536742',
+        cNumber: '012345',
+        password: '!xNQ5oFkRa>>nc'
+    },
+    {
+        cpf: '85937201459',
+        cNumber: '678901',
+        password: 'Pa$$w0rd1!'
+    },
+    {
+        cpf: '47382910568',
+        cNumber: '234567',
+        password: 'S3cureP@ss'
+    },
+    {
+        cpf: '09128374655',
+        cNumber: '890123',
+        password: 'MyP@ssw0rd!'
+    }
+]
 
 require('dotenv').config()
+
+const validatePassword = (credentials)=> {
+    const { credential, password } = credentials;
+    for (let user of standardUserApp) {
+        if (user.cpf == credential && user.password == password || user.cNumber == credential && user.password == password) {
+            return true;
+        }
+    }
+    return false;
+} 
+const createToken = ()=> {
+    return jwt.sign({userId: 1}, process.env.ACCESS_TOKEN_SECRET, {expiresIn: 300})
+
+} 
+
+const validateJWT = (req, res, next) => {
+    const token = req.headers['x-access-token']
+    
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if(err) return res.status(401).end()
+
+        req.userId = decoded.userId
+        next()
+    })
+}
 
 
 const checkUser = async(userCredential) => {
@@ -163,5 +208,8 @@ module.exports = {
     checkUserApp,
     generatePassword,
     passwordExistsInDatabase,
-    censorEmail
+    censorEmail,
+    validatePassword,
+    createToken,
+    validateJWT
 }
