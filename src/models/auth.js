@@ -2,62 +2,90 @@ const axios = require('axios')
 const https = require('https')
 const dotenv = require('dotenv').config()
 const jwt = require('jsonwebtoken')
+const { client } = require('../prisma/client')
+const dayjs = require('dayjs')
 const instance = axios.create({
     httpsAgent: new https.Agent({
         rejectUnauthorized: false
     })
 })
 
-const SECRET = 'predialnet'
+const standardUser = [
+    { cpf: '19242536741', cNumber: '123456', email: 'caiomdavidinha@gmail.com' },
+    { cpf: '19242536741', cNumber: '234567', email: 'caiomdavidinha2@gmail.com' },
+    { cpf: '19242536741', cNumber: '345678', email: 'caiomdavidinha3@gmail.com' },
+    { cpf: '19242536742', cNumber: '012345', email: 'caiovidinha@gmail.com' },
+    { cpf: '19242536742', cNumber: '567890', email: 'caiovidinha2@gmail.com' },
+    { cpf: '19242536742', cNumber: '678901', email: 'caiovidinha3@gmail.com' },
+    { cpf: '19242536743', cNumber: '678910', email: 'joao.silva@gmail.com' },
+    { cpf: '19242536743', cNumber: '789012', email: 'joao.silva2@gmail.com' },
+    { cpf: '19242536744', cNumber: '111213', email: 'maria.oliveira@gmail.com' },
+    { cpf: '19242536744', cNumber: '890123', email: 'maria.oliveira2@gmail.com' },
+    { cpf: '19242536745', cNumber: '141516', email: 'ana.souza@gmail.com' },
+    { cpf: '19242536745', cNumber: '901234', email: 'ana.souza2@gmail.com' },
+    { cpf: '19242536746', cNumber: '171819', email: 'pedro.almeida@gmail.com' },
+    { cpf: '19242536746', cNumber: '012345', email: 'pedro.almeida2@gmail.com' },
+    { cpf: '19242536747', cNumber: '202122', email: 'claudia.pereira@gmail.com' },
+    { cpf: '19242536747', cNumber: '234567', email: 'claudia.pereira2@gmail.com' },
+    { cpf: '19242536748', cNumber: '232425', email: 'bruno.martins@gmail.com' },
+    { cpf: '19242536748', cNumber: '345678', email: 'bruno.martins2@gmail.com' },
+    { cpf: '19242536749', cNumber: '262728', email: 'rafaela.fernandes@gmail.com' },
+    { cpf: '19242536749', cNumber: '567890', email: 'rafaela.fernandes2@gmail.com' },
+    { cpf: '19242536750', cNumber: '293031', email: 'lucas.rodrigues@gmail.com' },
+    { cpf: '19242536750', cNumber: '678901', email: 'lucas.rodrigues2@gmail.com' },
+    { cpf: '19242536751', cNumber: '303132', email: 'mariana.santos@gmail.com' },
+    { cpf: '19242536751', cNumber: '789012', email: 'mariana.santos2@gmail.com' },
+    { cpf: '19242536752', cNumber: '313233', email: 'fernando.silva@gmail.com' },
+    { cpf: '19242536752', cNumber: '890123', email: 'fernando.silva2@gmail.com' },
+    { cpf: '19242536753', cNumber: '323334', email: 'juliana.alves@gmail.com' },
+    { cpf: '19242536753', cNumber: '901234', email: 'juliana.alves2@gmail.com' },
+    { cpf: '19242536754', cNumber: '333435', email: 'roberto.costa@gmail.com' },
+    { cpf: '19242536754', cNumber: '012345', email: 'roberto.costa2@gmail.com' }
+];
 
-const standardUser = [{
-    cpf: '19242536741',
-    cNumber: '123456',
-    email: 'caiomdavidinha@gmail.com'
-},{    
-    cpf: '19242536742',
-    cNumber: '012345',
-    email: 'caiovidinha@gmail.com'
-}]
 
-const standardUserApp = [
-    {
-        cpf: '19242536742',
-        cNumber: '012345',
-        password: '!xNQ5oFkRa>>nc'
-    },
-    {
-        cpf: '85937201459',
-        cNumber: '678901',
-        password: 'Pa$$w0rd1!'
-    },
-    {
-        cpf: '47382910568',
-        cNumber: '234567',
-        password: 'S3cureP@ss'
-    },
-    {
-        cpf: '09128374655',
-        cNumber: '890123',
-        password: 'MyP@ssw0rd!'
-    }
-]
+
+
 
 require('dotenv').config()
 
-const validatePassword = (credentials)=> {
-    const { credential, password } = credentials;
-    for (let user of standardUserApp) {
-        if (user.cpf == credential && user.password == password || user.cNumber == credential && user.password == password) {
-            return true;
+const passwordExistsInDatabase = async (password)=> {
+
+    const user = await client.user.findFirst({
+        where:{
+            password: password
         }
-    }
-    return false;
+    })
+    if(!user) return false;
+    return true
 } 
-const createToken = ()=> {
-    return jwt.sign({userId: 1}, process.env.ACCESS_TOKEN_SECRET, {expiresIn: 300})
+const createToken = async (userId)=> {
+    const token = jwt.sign({userId: userId}, process.env.ACCESS_TOKEN_SECRET, {expiresIn: 300})
+    await client.refreshToken.deleteMany({
+        where: {
+            userId: userId
+        }
+    })
+    const refreshToken = await generateRefreshToken(userId)
+    return { token, refreshToken }
 
 } 
+const refreshJWT = async (userId)=> {
+    const token = jwt.sign({userId: userId}, process.env.ACCESS_TOKEN_SECRET, {expiresIn: 300})
+    return token
+} 
+
+
+const generateRefreshToken = async(userId)=>{
+    const expiresIn = dayjs().add(15, "sec").unix()
+    const refToken = await client.refreshToken.create({
+        data: {
+            userId,
+            expiresIn
+        }
+    })
+    return refToken
+}
 
 const validateJWT = (req, res, next) => {
     const token = req.headers['x-access-token']
@@ -65,88 +93,58 @@ const validateJWT = (req, res, next) => {
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
         if(err) return res.status(401).end()
 
-        req.userId = decoded.userId
+        req.cpf = decoded.cpf
         next()
     })
 }
 
 
-const checkUser = async(userCredential) => {
-    let user
-    if(userCredential.length < 11) {
-        for(let i=0;i<standardUser.length;i++){
-            if(userCredential==standardUser[i].cNumber) {
-                
-                user = {
-                    cpf: standardUser[i].cpf,
-                    cNumber: standardUser[i].cNumber,
-                    email: standardUser[i].email,
-                }
-            }
-        }
-            if(user) return {
-                status: 'É cliente (CN)',
-                cpf: user.cpf,
-                numeroCliente: user.cNumber,
-                email: user.email
-            }
-            return {error: 'Número do cliente não existe'}
-        }
-    
-    
-        for(let i=0;i<standardUser.length;i++){
-            if(userCredential==standardUser[i].cpf) {
-                
-                user = {
-                    cpf: standardUser[i].cpf,
-                    cNumber: standardUser[i].cNumber,
-                    email: standardUser[i].email
-                }
-            }
-        }
-    if(user) return {
-        status: 'É cliente (CPF)',
-        cpf: user.cpf,
-        numeroCliente: user.cNumber,
-        email:user.email
-    }
-    return {error: 'CPF Não existe'}
+const getUsersByCPF = async(cpf) => {
+    return standardUser.filter(user => user.cpf === cpf)
 }
 
-
-const checkUserApp = async(userCredential)=>{
-    let user
-    //lidando com cNumber
-    if(userCredential.length < 11) {
-        for(let i=0;i<standardUserApp.length;i++){
-            if(userCredential==standardUserApp[i].cNumber) {
-                
-                user = {
-                    cpf: standardUserApp[i].cpf,
-                    cNumber: standardUserApp[i].cNumber,
-                    password: standardUserApp[i].password
-                }
+const refreshTokenRegenerate = async(refresh_token) => {
+    const refreshToken = await client.refreshToken.findFirst({
+        where: {
+            id: refresh_token
+        }
+    })
+    if(!refreshToken) return false
+    const newToken = await refreshJWT(refreshToken.userId)
+    const refreshTokenExpired = dayjs().isAfter(dayjs.unix(refreshToken.expiresIn))
+    if(refreshTokenExpired){
+        await client.refreshToken.deleteMany({
+            where: {
+                userId: refreshToken.userId
             }
-        }
-            if(user) return {error:`(CN) Usuário já possui conta.`}
-            return 'Criar senha'
-        }
-
-        //lidando com cpf
-        for(let i=0;i<standardUserApp.length;i++){
-            if(userCredential==standardUserApp[i].cpf) {
-                
-                user = {
-                    cpf: standardUserApp[i].cpf,
-                    cNumber: standardUserApp[i].cNumber,
-                    password: standardUserApp[i].password,
-                }
-            }
-        }
-    if(user) return {error:`(CPF) Usuário já possui conta.`}
-    return {
-        status: 'Criar senha'
+        })
+        const newRefreshToken = await generateRefreshToken(refreshToken.userId)
+        return { newToken, newRefreshToken}
     }
+    return newToken
+}
+
+const getUsers = async(userCredential) => {
+    let users = []
+    if(userCredential.length < 11) {
+            const findUser = standardUser.find(user => user.cNumber === userCredential)
+            if (!findUser) return false
+            users = await getUsersByCPF(findUser.cpf)
+            return {
+                cpf:findUser.cpf,
+                email:findUser.email,
+                registros: users
+            } 
+    }
+    users = await getUsersByCPF(userCredential)
+    const firstUser = standardUser.find(user => user.cpf === userCredential)
+    if(!firstUser) return false
+    return {
+        cpf:firstUser.cpf,
+        email:firstUser.email,
+        registros: users
+    }
+    
 }
 
 const generatePassword = () => {
@@ -187,14 +185,9 @@ const generatePassword = () => {
     
         // Shuffle the password to ensure randomness
         password = password.split('').sort(() => 0.5 - Math.random()).join('')
-    
         return password
 }
 
-const passwordExistsInDatabase = (password) => {
-    // Esta função deve verificar se a senha já existe no banco de dados
-    return false
-}
 
 const censorEmail = (email) => {
     const [localPart, domain] = email.split('@')
@@ -204,12 +197,13 @@ const censorEmail = (email) => {
 
 
 module.exports = {
-    checkUser,
-    checkUserApp,
+    getUsers,
     generatePassword,
-    passwordExistsInDatabase,
     censorEmail,
-    validatePassword,
+    passwordExistsInDatabase,
     createToken,
-    validateJWT
+    refreshJWT,
+    validateJWT,
+    generateRefreshToken,
+    refreshTokenRegenerate
 }

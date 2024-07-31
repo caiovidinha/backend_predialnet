@@ -1,17 +1,22 @@
 services:
-  postgres:
-    image: bitnami/postgresql:latest
-    container_name: app_predialnet_db
-    restart: always
-    ports:
-      - '5431:5432'
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-container
     environment:
-      - POSTGRES_USER=docker
-      - POSTGRES_PASSWORD=docker
-      - POSTGRES_DB=database
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_DATABASE: predialnet
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin
+    ports:
+      - "13306:3306"
     volumes:
-      - pgdata:/data/postgres
+      - mysql-data:/var/lib/mysql
+
+  adminer:
+    image: adminer
+    container_name: adminer-container
+    ports:
+      - "8080:8080"
 
 volumes:
-  pgdata:
-    driver: local
+  mysql-data:

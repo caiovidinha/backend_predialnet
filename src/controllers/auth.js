@@ -1,9 +1,8 @@
-const { PrismaClient } = require("@prisma/client")
-const { checkUser, checkUserApp, generatePassword, passwordExistsInDatabase, censorEmail, validatePassword, createToken } = require("../models/auth")
+const { client } = require("../prisma/client")
+const {  generatePassword, passwordExistsInDatabase, censorEmail, createToken, getUsers } = require("../models/auth")
 const { z } = require('zod')
-const { status } = require("express/lib/response")
+const { hash, compare } = require('bcryptjs')
 
-const prisma = new PrismaClient()
 
 getOk = async(request, response) => {
     return response.status(200).json({pong: "true"})
@@ -19,45 +18,53 @@ newUser = async(req, res) => {
     const body = newUserSchema.safeParse(req.body)
     if(!body.success) return res.json({ error: 'Dados inválidos' })
 
-    body.data.password
-
     const { userCredential } = req.body
     //checkUser
-    const userStatusDBPredial = await checkUser(userCredential)
-    
-    if(userStatusDBPredial.error) {
-        console.log(userStatusDBPredial.error)
-        return res.status(404).json(userStatusDBPredial.error)
+    const cliente = await getUsers(userCredential)
+
+    if(!cliente) {
+        return res.status(404).json({error: 'Não é cliente predialnet'})
     }
 
-    //checkAppDatabase
-    const userStatusApp = await checkUserApp(userCredential)
-    if(userStatusApp.error) {
-        console.log(userStatusApp.error)
-        return res.status(404).json(userStatusApp.error)
-    }
-    
+    const userAlreadyExists = await client.user.findFirst({
+        where: {
+            cpf: cliente.cpf
+        }
+    })
+    if(userAlreadyExists) return res.status(400).json({error: 'Usuário já existe.'})
     //generatePassword
     let newPassword
     do {
         newPassword = generatePassword()
-    } while (passwordExistsInDatabase(newPassword))
+    } while (await passwordExistsInDatabase(newPassword))
+    const hashPassword = await hash(newPassword, 10)
+
+    let users = []
+    
+    for (const registro of cliente.registros) {
+        const user = await client.user.create({
+            data: {
+                cNumber: registro.cNumber,
+                cpf: cliente.cpf,
+                password: hashPassword,
+            }
+        });
+        users.push(user);
+    }
 
     //createUser (db)
     const infos = {
-        statusDBPredial: userStatusDBPredial,
-        statusApp: userStatusApp,
+        cliente: cliente,
+        userAlreadyExists: userAlreadyExists,
+        email: cliente.email,
+        registrosDB: users,
         password: newPassword,
-        email: userStatusDBPredial.email,
-        registroDB: {
-            cpf: userStatusDBPredial.cpf,
-            numeroCliente: userStatusDBPredial.numeroCliente,
-            password: newPassword,
-        },
         status: "Conta criada com sucesso"
     }
+    
 
     //TODO: enviar senha por email/sms
+    return res.status(201).json(infos)
     return res.status(201).json(censorEmail(infos.email))
 }
 
@@ -69,24 +76,32 @@ login = async (req, res) => {
     const body = loginSchema.safeParse(req.body)
     if(!body.success) return res.status(400).json({error: 'Dados inválidos'})
 
+       
+    const cliente = await getUsers(body.data.credential)
+    if(!cliente) {
+        return res.status(403).json({error: 'Não é um cliente predialnet'})
+    }
+    const userExists = 
+    body.data.credential.length  < 11 
+    ? await client.user.findFirst({
+        where: {
+            cNumber: body.data.credential
+        }
+    }) 
+    : await client.user.findFirst({
+        where: {
+            cpf: cliente.cpf
+        }
+    })
 
-    const userStatusDBPredial = await checkUser(body.data.credential)
+    if(!userExists) return res.status(403).json({error: 'Usuário ou senha incorretos'})
+        
+    const validatePassword = await compare(body.data.password, userExists.password)
+    if(!validatePassword) return res.status(403).json({error: 'Usuário ou senha incorretos'})
     
-    if(userStatusDBPredial.error) {
-        return res.status(403).json(userStatusDBPredial.error)
-    }
-
-    const userStatusApp = await checkUserApp(body.data.credential)
-    if(!userStatusApp.error) {
-        return res.status(403).json({error: "Conta não existe no app"})
-    }
-
-    if(validatePassword(body.data)) {
-        return res.status(201).json({
-            token: createToken()
-        })
-    }
-    return res.status(403).json({error: "Senha inválida"})
+    return res.status(201).json({
+        tokens: await createToken(userExists.id)
+    })
 }
 
 module.exports = {

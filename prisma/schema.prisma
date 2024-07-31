@@ -3,13 +3,25 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  cNumber  BigInt
-  cpf      String
-  password String
+  id            String        @id @default(uuid())
+  cNumber       String        @unique
+  cpf           String
+  password      String
+  refresh_token RefreshToken?
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String @id @default(uuid())
+  expiresIn Int
+  user      User   @relation(fields: [userId], references: [id])
+  userId    String @unique
+
+  @@map("refresh_token")
 }
