@@ -21,17 +21,17 @@ newUser = async(req, res) => {
     const { userCredential } = req.body
     //checkUser
     const cliente = await getUsers(userCredential)
-
     if(!cliente) {
         return res.status(404).json({error: 'Não é cliente predialnet'})
     }
-
+    
     const userAlreadyExists = await client.user.findFirst({
         where: {
             cpf: cliente.cpf
         }
     })
-    if(userAlreadyExists) return res.status(400).json({error: 'Usuário já existe.'})
+    if(userAlreadyExists) return res.status(404).json({error: 'Usuário já existe.'})
+        console.log('oi')
     //generatePassword
     let newPassword
     do {
@@ -64,7 +64,7 @@ newUser = async(req, res) => {
     
 
     //TODO: enviar senha por email/sms
-    return res.status(201).json(infos)
+    // return res.status(201).json(infos)
     return res.status(201).json(censorEmail(infos.email))
 }
 
