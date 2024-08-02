@@ -31,7 +31,6 @@ newUser = async(req, res) => {
         }
     })
     if(userAlreadyExists) return res.status(404).json({error: 'Usuário já existe.'})
-        console.log('oi')
     //generatePassword
     let newPassword
     do {
@@ -93,7 +92,6 @@ login = async (req, res) => {
             cpf: cliente.cpf
         }
     })
-
     if(!userExists) return res.status(403).json({error: 'Usuário ou senha incorretos'})
         
     const validatePassword = await compare(body.data.password, userExists.password)
