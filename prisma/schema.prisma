@@ -8,11 +8,13 @@ datasource db {
 }
 
 model User {
-  id            String        @id @default(uuid())
-  cNumber       String        @unique
-  cpf           String
-  password      String
-  refresh_token RefreshToken?
+  id             String         @id @default(uuid())
+  cNumber        String         @unique
+  cpf            String
+  email          String
+  password       String
+  refresh_token  RefreshToken?
+  password_token PasswordToken?
 
   @@map("users")
 }
@@ -24,4 +26,13 @@ model RefreshToken {
   userId    String @unique
 
   @@map("refresh_token")
+}
+
+model PasswordToken {
+  id        String   @id @default(uuid())
+  expiresIn DateTime
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+
+  @@map("password_token")
 }
