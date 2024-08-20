@@ -127,9 +127,10 @@ forgotPassword = async (req, res) => {
         passToken +
         "&email=" +
         email;
-
+    const hashEmail = censorEmail(email);
     return res.status(200).json({
         urlResetPassword: urlResetPassword,
+        email: hashEmail,
     });
 };
 
