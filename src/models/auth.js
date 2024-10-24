@@ -4,6 +4,7 @@ const dotenv = require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const { client } = require("../prisma/client");
 const dayjs = require("dayjs");
+
 const instance = axios.create({
     httpsAgent: new https.Agent({
         rejectUnauthorized: false,
@@ -121,6 +122,32 @@ const standardUser = [
 
 require("dotenv").config();
 
+const loginAPI = async() => {
+    const data = {   
+        "email": process.env.API_LOGIN,
+        "password": process.env.API_PASS
+    }
+    const JWT = await instance.post('https://uaipi.predialnet.com.br/v1/auth/login',data)
+    return JWT.data.data.access_token
+}
+
+const sendEmail = async(to,subject,body) => {
+    const data = {
+        "to": to,
+        "subject": subject,
+        "htmlContent": body
+    }
+    const token = await loginAPI()
+    const email = await instance.post('https://uaipi.predialnet.com.br/v1/enviar-email',data,{
+        headers: {
+            'Authorization': `Bearer ${token}`
+            }
+        })
+    if(!email) return {error: "Erro ao enviar o e-mail"}
+    return email
+}
+
+
 const passwordExistsInDatabase = async (password) => {
     const user = await client.user.findFirst({
         where: {
@@ -130,6 +157,8 @@ const passwordExistsInDatabase = async (password) => {
     if (!user) return false;
     return true;
 };
+
+
 const createToken = async (userId) => {
     const token = jwt.sign(
         { userId: userId },
@@ -146,6 +175,8 @@ const createToken = async (userId) => {
     const refreshToken = await generateRefreshToken(userId);
     return { token, refreshToken };
 };
+
+
 const refreshJWT = async (userId) => {
     const token = jwt.sign(
         { userId: userId },
@@ -156,6 +187,7 @@ const refreshJWT = async (userId) => {
     );
     return token;
 };
+
 
 const generateRefreshToken = async (userId) => {
     const expiresIn = dayjs().add(15, "sec").unix();
@@ -192,6 +224,7 @@ const generatePasswordToken = async (userId) => {
     return passToken;
 };
 
+
 const validateJWT = (req, res, next) => {
     const token = req.headers["x-access-token"];
 
@@ -203,8 +236,15 @@ const validateJWT = (req, res, next) => {
     });
 };
 
-const getUsersByCPF = async (cpf) => {
-    return standardUser.filter((user) => user.cpf === cpf);
+
+const getUsersByCPF = async (credential) => {
+    const token = await loginAPI()
+    const list = await axios.get(`https://uaipi.predialnet.com.br/v1/clientes/${credential}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                            }
+                        })
+    return(list.data.data)
 };
 
 const refreshTokenRegenerate = async (refresh_token) => {
@@ -231,26 +271,17 @@ const refreshTokenRegenerate = async (refresh_token) => {
 };
 
 const getUsers = async (userCredential) => {
-    let users = [];
-    if (userCredential.length < 11) {
-        const findUser = standardUser.find(
-            (user) => user.cNumber === userCredential,
-        );
-        if (!findUser) return false;
-        users = await getUsersByCPF(findUser.cpf);
-        return {
-            cpf: findUser.cpf,
-            email: findUser.email,
-            registros: users,
-        };
-    }
+    let users = []
     users = await getUsersByCPF(userCredential);
-    const firstUser = standardUser.find((user) => user.cpf === userCredential);
-    if (!firstUser) return false;
+    const cpf = users[0].cliente.inscricao
+    const email = users[0].cliente.email
+    const nome = users[0].cliente.nome
+    if(!users) return false
     return {
-        cpf: firstUser.cpf,
-        email: firstUser.email,
-        registros: users,
+        users,
+        nome,
+        cpf,
+        email
     };
 };
 
@@ -269,7 +300,7 @@ const generatePassword = () => {
     const lowerChars = "abcdefghijklmnopqrstuvwxyz";
     const upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const numbers = "0123456789";
-    const specialChars = "!@#$%^&*()-_=+[]{}|;:,.<>?";
+    const specialChars = "!@#$%&*";
 
     function getRandomChar(charSet) {
         return charSet[Math.floor(Math.random() * charSet.length)];
@@ -311,12 +342,73 @@ const generatePassword = () => {
 
 const censorEmail = (email) => {
     const [localPart, domain] = email.split("@");
-    const censoredLocalPart =
-        localPart.slice(0, 3) +
-        "*".repeat(localPart.length - 4) +
-        localPart.slice(-1);
-    return `${censoredLocalPart}@${domain}`;
+    const censorLocalPart = (localPart) => {
+        const localArr = localPart.split('');
+        const numCharsToCensor = Math.max(1, Math.floor(localPart.length * 0.5)); // Censura metade dos caracteres, no mínimo 1
+
+        let censoredIndices = new Set();
+        while (censoredIndices.size < numCharsToCensor) {
+            const randomIndex = Math.floor(Math.random() * localPart.length);
+            censoredIndices.add(randomIndex);
+        }
+
+        censoredIndices.forEach(index => {
+            localArr[index] = '*'; // Substitui o caractere por '*'
+        });
+
+        return localArr.join('');
+    };
+    const censoredLocalPart = censorLocalPart(localPart);
+
+    const cEmail = `${censoredLocalPart}@${domain}`
+    return cEmail;
 };
+
+const getCorrectEmail = async (censoredEmail) => {
+    const correctEmail = await client.emails.findFirst({
+        where: {
+            censoredEmail: censoredEmail
+        }
+    })
+    return correctEmail.email;
+}
+
+const censorEmailList = async (emailLists) => {
+    let censoredEmails = new Set();
+    const unicos = new Set(emailLists);
+    const emailList = Array.from(unicos);
+  
+    await Promise.all(
+      emailList.map(async (email) => {
+        let censoredEmail;
+        let newEmail = false;
+        do {
+          const checkDB = await client.emails.findFirst({
+            where: {
+              email: email,
+            },
+          });
+          if (checkDB == null) {
+            censoredEmail = censorEmail(email);
+            newEmail = true;
+          } else {
+            censoredEmail = checkDB.censoredEmail;
+          }
+        } while (censoredEmails.has(censoredEmail)); // Garante que o censurado seja único
+        censoredEmails.add(censoredEmail);
+        if (newEmail) {
+          await client.emails.create({
+            data: {
+              censoredEmail: censoredEmail,
+              email: email,
+            },
+          });
+        }
+      })
+    );
+  
+    return censoredEmails;
+  };
 
 module.exports = {
     getUsers,
@@ -330,4 +422,9 @@ module.exports = {
     refreshTokenRegenerate,
     getUsersByEmail,
     generatePasswordToken,
+    loginAPI,
+    getUsersByCPF,
+    sendEmail,
+    censorEmailList,
+    getCorrectEmail
 };

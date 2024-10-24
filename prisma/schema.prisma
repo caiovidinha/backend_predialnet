@@ -9,14 +9,22 @@ datasource db {
 
 model User {
   id             String         @id @default(uuid())
-  cNumber        String         @unique
-  cpf            String
+  cpf            String         @unique
   email          String
   password       String
   refresh_token  RefreshToken?
   password_token PasswordToken?
+  show_ad        ShowAd?        
 
   @@map("users")
+}
+
+model Emails {
+  id            String @id @default(uuid())
+  censoredEmail String 
+  email         String 
+
+  @@map("emails")
 }
 
 model RefreshToken {
@@ -35,4 +43,14 @@ model PasswordToken {
   userId    String   @unique
 
   @@map("password_token")
+}
+
+model ShowAd {
+  id        String   @id @default(uuid())
+  expiresIn DateTime
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  show      Boolean  @default(true)
+
+  @@map("show_ad")
 }
