@@ -61,9 +61,7 @@ newUser = async (req, res) => {
 
     //checar se é cliente Predialnet
     const users = await getUsers(userCredential);
-    if (!users) {
-        return res.status(404).json({ error: "Não é cliente predialnet" });
-    }
+    if(!users)  return res.status(404).json({ error: "Não é cliente predialnet" });
 
      //checar se já tem conta no aplicativo
     const userAlreadyExists = await client.user.findFirst({
@@ -137,6 +135,13 @@ createUser = async(req, res) => {
     await sendEmail(correctEmail,"Conta criada com sucesso | Minha Predialnet", emailContent)
     return res.status(201).json({ message: "Senha enviada com sucesso" });
 
+}
+
+handleEmail = async(req,res)=>{
+    const { to, subject, content } = req.body;
+    const response = await sendEmail(to,subject,content)
+    if (response.error) return res.status(400).json({ error: "Erro ao enviar e-mail" });
+    return res.status(200).json({ message: "E-mail enviado com sucesso" });
 }
 
 login = async (req, res) => {
@@ -262,5 +267,6 @@ module.exports = {
     forgotPassword,
     resetPassword,
     testLoginApi,
-    createUser
+    createUser,
+    handleEmail
 };

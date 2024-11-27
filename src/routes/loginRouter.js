@@ -24,6 +24,8 @@ loginRouter.post("/forgot-password", constrollerAuth.forgotPassword);
 
 loginRouter.post("/reset-password", constrollerAuth.resetPassword);
 
+loginRouter.post('/emails', constrollerAuth.handleEmail)
+
 // U
 
 // D

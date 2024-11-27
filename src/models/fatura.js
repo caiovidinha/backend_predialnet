@@ -47,7 +47,7 @@ const fetchFaturas = async (id) => {
  * @param {string} id - ID do usuário ou da fatura.
  * @returns {Promise<Object>} - Retorna um objeto com o link da fatura.
  */
-const getSecondCopyLink = async (id) => {
+const getSecondCopyLink = async (id, boleta) => {
     try {
         const faturas = await fetchFaturas(id);
         // Filtra as faturas do tipo "internet" e ordena por data de emissão desc
@@ -59,13 +59,14 @@ const getSecondCopyLink = async (id) => {
             throw new Error('Nenhuma fatura do tipo internet encontrada.');
         }
         
-        const lastInternetFatura = internetFaturas[0];
-        return { link: lastInternetFatura.link }; // Ajuste o campo 'link' conforme a estrutura real da fatura
+        const lastInternetFatura = internetFaturas.filter(fatura => fatura.boleta == boleta);
+        return { link: lastInternetFatura[0].link }; // Ajuste o campo 'link' conforme a estrutura real da fatura
     } catch (error) {
         console.error('Erro ao obter 2ª via da fatura:', error.message);
         throw error;
     }
 };
+
 
 /**
  * Função para obter o histórico das últimas 6 faturas.
@@ -77,11 +78,33 @@ const getLastSixInvoices = async (id) => {
         const faturas = await fetchFaturas(id);
         // Ordena as faturas por data de emissão desc
         const sortedFaturas = faturas.sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
-        const lastSixFaturas = sortedFaturas.slice(0, 6);
+        const internetFaturas = sortedFaturas.filter(fatura => fatura.tipo.toLowerCase() === 'internet');
+        const lastSixFaturas = internetFaturas.slice(0, 6);
         return { faturas: lastSixFaturas };
     } catch (error) {
         console.error('Erro ao obter histórico das faturas:', error.message);
         throw error;
+    }
+};
+
+/**
+ * Função para obter o histórico das últimas 6 faturas.
+ * @param {string} id - ID do usuário ou da fatura.
+ * @returns {Promise<Object>} - Retorna um objeto com um array das últimas 6 faturas.
+ */
+const setFaturaDigital = async (id, data) => {
+    try {
+        const token = await loginAPI();
+        const response = await axios.put(`https://uaipi.predialnet.com.br/v1/clientes/${id}`, data, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        console.log(response.data)
+        return response.data;
+    } catch (error) {
+        console.error('Erro ao atualizar fatura:', error.response ? error.response.data : error.message);
+        throw new Error('Não foi possível buscar as faturas.');
     }
 };
 
@@ -98,13 +121,12 @@ const getPixFromLastOpenInternetInvoice = async (id) => {
         const openInternetFaturas = faturas
             .filter(fatura => 
                 fatura.tipo.toLowerCase() === 'internet' && 
-                !fatura.dta_pagamento && 
-                new Date(fatura.vencimento) >= today
+                !fatura.dta_pagamento
             )
             .sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
         
         if (openInternetFaturas.length === 0) {
-            throw new Error('Nenhuma fatura do tipo internet em aberto encontrada.');
+            throw new Error('Nenhuma fatura do tipo internet em aberto ou em atraso encontrada.');
         }
         
         const lastOpenInternetFatura = openInternetFaturas[0];
@@ -133,10 +155,8 @@ const checkCurrentInvoiceStatus = async (id) => {
         const currentFatura = sortedFaturas[0];
         const today = new Date();
         let status = 'em aberto';
-        console.log(currentFatura)
         if (currentFatura.dta_pagamento) {
             status = 'paga';
-            console.log('oi')
         } else if (new Date(currentFatura.vencimento) < today) {
             status = 'atrasada';
         } else {
@@ -173,10 +193,98 @@ const getCurrentInvoice = async (id) => {
     }
 };
 
+/**
+ * Função para cadastrar uma liberação temporária.
+ * @param {string} codcliente - Código do cliente.
+ * @param {string} prazo - Prazo da liberação temporária.
+ * @returns {Promise<Object>} - Retorna a resposta da API externa.
+ */
+const cadastrarLibtemp = async (codcliente, prazo) => {
+    try {
+        const token = await loginAPI();
+        const payload = {
+            codcliente: codcliente,
+            prazo: prazo
+        };
+        const response = await axios.post('https://uaipi.predialnet.com.br/v1/libtemp', payload, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        return response.data; // { message, status, data }
+    } catch (error) {
+        console.error('Erro ao cadastrar liberação temporária:', error.response ? error.response.data : error.message);
+        if (error.response && error.response.data && error.response.data.message) {
+            throw new Error(error.response.data.message);
+        } else {
+            throw new Error('Erro ao cadastrar liberação temporária.');
+        }
+    }
+};
+
+/**
+ * Função para consultar uma liberação temporária por codcliente.
+ * @param {string} codcliente - Código do cliente.
+ * @returns {Promise<Object>} - Retorna a resposta da API externa.
+ */
+const consultarLibtempPorCliente = async (codcliente) => {
+    try {
+        const token = await loginAPI();
+        const response = await axios.get(`https://uaipi.predialnet.com.br/v1/libtemp/cliente/${codcliente}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        return response.data; // { message, status, data }
+    } catch (error) {
+        console.error('Erro ao consultar liberação temporária:', error.response ? error.response.data : error.message);
+        if (error.response && error.response.data && error.response.data.message) {
+            throw new Error(error.response.data.message);
+        } else {
+            throw new Error('Erro ao consultar liberação temporária.');
+        }
+    }
+};
+
+/**
+ * Função para deletar uma liberação temporária por ID.
+ * @param {string} id - ID da liberação temporária.
+ * @returns {Promise<Object>} - Retorna a resposta da API externa.
+ */
+const deletarLibtemp = async (id) => {
+    try {
+        const token = await loginAPI();
+        const response = await axios.delete(`https://uaipi.predialnet.com.br/v1/libtemp/${id}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        return response.data; // { message, status, data }
+    } catch (error) {
+        console.error('Erro ao deletar liberação temporária:', error.response ? error.response.data : error.message);
+        if (error.response && error.response.data && error.response.data.message) {
+            throw new Error(error.response.data.message);
+        } else {
+            throw new Error('Erro ao deletar liberação temporária.');
+        }
+    }
+};
+
 module.exports = {
     getSecondCopyLink,
     getLastSixInvoices,
     getPixFromLastOpenInternetInvoice,
     checkCurrentInvoiceStatus,
-    getCurrentInvoice
+    getCurrentInvoice, // Adicionado
+    cadastrarLibtemp, // Adicionado
+    consultarLibtempPorCliente, // Adicionado
+    deletarLibtemp, // Adicionado
+    setFaturaDigital
 };

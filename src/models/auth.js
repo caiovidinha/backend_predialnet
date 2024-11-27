@@ -131,11 +131,11 @@ const loginAPI = async() => {
     return JWT.data.data.access_token
 }
 
-const sendEmail = async(to,subject,body) => {
+const sendEmail = async(to,subject,content) => {
     const data = {
         "to": to,
         "subject": subject,
-        "htmlContent": body
+        "htmlContent": content
     }
     const token = await loginAPI()
     const email = await instance.post('https://uaipi.predialnet.com.br/v1/enviar-email',data,{
@@ -239,12 +239,18 @@ const validateJWT = (req, res, next) => {
 
 const getUsersByCPF = async (credential) => {
     const token = await loginAPI()
-    const list = await axios.get(`https://uaipi.predialnet.com.br/v1/clientes/${credential}`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                            }
-                        })
-    return(list.data.data)
+    try {
+        const list = await axios.get(`https://uaipi.predialnet.com.br/v1/clientes/${credential}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+                }
+            })  
+        return(list.data.data)
+    } catch (error) {
+        return false
+    }
+         
+    
 };
 
 const refreshTokenRegenerate = async (refresh_token) => {
@@ -273,10 +279,10 @@ const refreshTokenRegenerate = async (refresh_token) => {
 const getUsers = async (userCredential) => {
     let users = []
     users = await getUsersByCPF(userCredential);
+    if(!users) return false
     const cpf = users[0].cliente.inscricao
     const email = users[0].cliente.email
     const nome = users[0].cliente.nome
-    if(!users) return false
     return {
         users,
         nome,

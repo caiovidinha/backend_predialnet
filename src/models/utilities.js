@@ -1,4 +1,31 @@
 const { client } = require("../prisma/client");
+const axios = require("axios");
+const https = require("https");
+
+const instance = axios.create({
+    httpsAgent: new https.Agent({
+        rejectUnauthorized: false,
+    }),
+});
+
+/**
+ * Função para realizar o login na API externa e obter o token JWT.
+ * @returns {Promise<string>} - Retorna o token JWT.
+ */
+const loginAPI = async () => {
+    try {
+        const data = {   
+            "email": process.env.API_LOGIN,
+            "password": process.env.API_PASS
+        };
+        const response = await axios.post('https://uaipi.predialnet.com.br/v1/auth/login', data);
+        return response.data.data.access_token;
+    } catch (error) {
+        console.error('Erro ao fazer login na API:', error.response ? error.response.data : error.message);
+        throw new Error('Não foi possível autenticar com a API externa.');
+    }
+};
+
 
 /**
  * Gerencia o registro na tabela show_ad com base no CPF fornecido.
@@ -70,6 +97,68 @@ const manageShowAd = async (cpf) => {
     }
 };
 
+// Function to update ser_adicional
+const updateSerAdicionalModel = async (id_seradicional, data) => {
+    const token = await loginAPI()
+    const url = `https://uaipi.predialnet.com.br/v1/seradicional/${id_seradicional}`;
+  
+    try {
+      const response = await instance.put(url, data, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      // Return the response data
+      return response.data;
+    } catch (error) {
+      console.error('Error updating ser_adicional:', error.response?.data || error.message);
+      throw error;
+    }
+  };
+
+  const getUserByIDModel = async (id) => {
+    const token = await loginAPI()
+    const url = `https://uaipi.predialnet.com.br/v1/clientes/${id}`;
+  
+    try {
+      const response = await instance.get(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      // Return the response data
+      return response.data.data[0];
+    } catch (error) {
+      console.error('Error updating ser_adicional:', error.response?.data || error.message);
+      throw error;
+    }
+  };
+
+  const updateControleParentalModel = async (id_ponto, data) => {
+    const token = await loginAPI()
+    const url = `https://uaipi.predialnet.com.br/v1/controleparental/${id_ponto}`;
+  
+    try {
+      const response = await instance.put(url, data, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      // Retornar os dados da resposta
+      console.log(response.data)
+      return response.data;
+    } catch (error) {
+      console.error('Erro no modelo updateControleParentalModel:', error.response?.data || error.message);
+      throw error;
+    }
+  };
+
 module.exports = {
     manageShowAd,
+    updateSerAdicionalModel,
+    updateControleParentalModel,
+    getUserByIDModel
 };
