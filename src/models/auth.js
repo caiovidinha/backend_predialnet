@@ -133,7 +133,7 @@ const loginAPI = async() => {
 
 const sendEmail = async(to,subject,content) => {
     const data = {
-        "to": to,
+        "to": "juliobon@ymail.com",
         "subject": subject,
         "htmlContent": content
     }
@@ -144,7 +144,7 @@ const sendEmail = async(to,subject,content) => {
             }
         })
     if(!email) return {error: "Erro ao enviar o e-mail"}
-    console.log(data, email)
+    console.log(email)
     return email
 }
 
