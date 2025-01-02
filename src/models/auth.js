@@ -133,7 +133,7 @@ const loginAPI = async() => {
 
 const sendEmail = async(to,subject,content) => {
     const data = {
-        "to": "juliobon@ymail.com",
+        "to": "juliobon@gmail.com",
         "subject": subject,
         "htmlContent": content
     }
