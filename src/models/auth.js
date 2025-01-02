@@ -144,7 +144,7 @@ const sendEmail = async(to,subject,content) => {
             }
         })
     if(!email) return {error: "Erro ao enviar o e-mail"}
-    console.log(email)
+    console.log(data, email)
     return email
 }
 
