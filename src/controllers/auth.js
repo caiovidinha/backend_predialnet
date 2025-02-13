@@ -182,26 +182,72 @@ login = async (req, res) => {
 };
 
 forgotPassword = async (req, res) => {
-    const { email } = req.body;
-    const user = await client.user.findFirst({
-        where: {
-            email: email,
-        },
-    });
-    if (!user) return res.status(403).json({ error: "Usuário não existe" });
-    const token = await generatePasswordToken(user.id);
-    const passToken = token.id;
-    const urlResetPassword =
-        "http://192.168.11.13:5500/index.html?token=" +
-        passToken +
-        "&email=" +
-        email;
-    const hashEmail = censorEmail(email);
-    return res.status(200).json({
-        urlResetPassword: urlResetPassword,
-        email: hashEmail,
-    });
+    try {
+        const { userCredential } = req.body;
+
+        // Buscar usuário pelo CPF (userCredential)
+        const user = await client.user.findFirst({
+            where: {
+                cpf: userCredential,  // Busca pelo CPF ao invés do email
+            },
+        });
+
+        if (!user) {
+            return res.status(403).json({ error: "Usuário não existe" });
+        }
+
+        // Gerar token para redefinição de senha
+        const token = await generatePasswordToken(user.id);
+        const passToken = token.id;
+
+        // Criar URL de redefinição de senha
+        const urlResetPassword = `https://www.predialnet.com.br/redefinir-senha?token=${passToken}&email=${user.email}`;
+
+        // Censurar e-mail para o retorno
+        const hashEmail = censorEmail(user.email);
+
+        // Criar o conteúdo do e-mail
+        const emailContent = `
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+            <div style="text-align: center; padding: 20px; background-color: #9c0004; color: white; border-radius: 8px 8px 0 0;">
+                <img src="https://i.ibb.co/py9Qsv9/logo-predialnet-branca.png" alt="Logo Predialnet" style="max-width: 150px; margin-bottom: 10px;">
+                <h1 style="margin: 0;">Redefinição de Senha</h1>
+            </div>
+
+            <div style="padding: 20px; text-align: center;">
+                <p>Olá,</p>
+                <p>Você solicitou a redefinição de sua senha.</p>
+                <p>Clique no botão abaixo para redefinir sua senha:</p>
+
+                <a href="${urlResetPassword}" style="display: inline-block; background-color: #9c0004; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px;">
+                    Redefinir Senha
+                </a>
+                <p>Se o botão acima não funcionar, copie e cole este link no seu navegador:</p>
+                <p><a href="${urlResetPassword}" style="word-break: break-all; color: #9c0004;">${urlResetPassword}</a></p>
+
+                <p>Se você não solicitou a redefinição, ignore este e-mail.</p>
+            </div>
+
+            <div style="text-align: center; padding: 20px; font-size: 12px; color: #888;">
+                <p>Se precisar de ajuda, entre em contato com nosso suporte através do <a href="mailto:suporte@predialnet.com.br" style="color: #9c0004; text-decoration: none;">suporte@predialnet.com.br</a>.</p>
+            </div>
+        </div>
+        `;
+
+        // Enviar e-mail com o link de redefinição
+        await sendEmail(user.email, "Redefinição de Senha | Predialnet", emailContent);
+
+        return res.status(200).json({
+            message: "E-mail enviado com sucesso!",
+            email: hashEmail, // Retorna o e-mail censurado
+        });
+
+    } catch (error) {
+        console.error("Erro ao processar solicitação de redefinição de senha:", error);
+        return res.status(500).json({ error: "Erro interno no servidor." });
+    }
 };
+
 
 resetPassword = async (req, res) => {
     const { email, token, newPassword } = req.body;
