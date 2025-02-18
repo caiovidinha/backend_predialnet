@@ -132,10 +132,22 @@ const loginAPI = async() => {
 }
 
 const sendEmail = async(to,subject,content) => {
-    const data = {
-        "to": to,
-        "subject": subject,
-        "htmlContent": content
+    let data = {}
+    if(to=="comercial@predialnet.com.br")
+    {
+        data = {
+            "to": to,
+            "subject": subject,
+            "htmlContent": content,
+            "cc": ["predialnet@predialnet.com.br"]
+        }   
+    }else{
+        data = {
+            "to": to,
+            "subject": subject,
+            "htmlContent": content,
+            "cc": []
+        }  
     }
     const token = await loginAPI()
     const email = await instance.post('https://uaipi.predialnet.com.br/v1/enviar-email',data,{
