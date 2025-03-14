@@ -118,7 +118,7 @@ createUser = async(req, res) => {
             <p>Ela serve para todos os números de cliente associados ao seu CPF.</p>
 
             <div style="background-color: #f2f2f2; padding: 15px; margin: 20px auto; border-radius: 8px; font-size: 18px; font-weight: bold; color: #333; display: inline-block;">
-                Sua senha: <span>123</span>
+                Sua senha: <span>${newPassword}</span>
             </div>
 
             <p>Você pode alterar sua senha diretamente no aplicativo a qualquer momento.</p>
