@@ -1,5 +1,5 @@
 const { google } = require("googleapis");
-const fs = require("fs");
+const { parse, format } = require("date-fns");
 const path = require("path");
 
 // Autenticação com a API do Google
@@ -14,23 +14,34 @@ const SHEET_ID = "1K6VI3mODd1nFUdZ7AzwbTiyW_tK_DXsgWV4g9fALDe4"; // ID da sua pl
 const SHEET_NAME = "Diário"; // Nome da aba
 
 /**
- * Converte a data de YYYY-MM-DD para DD/MM/YYYY se necessário.
- * @param {string} dateString - Data no formato YYYY-MM-DD ou DD/MM/YYYY.
+ * Converte a data de diferentes formatos para DD/MM/YYYY.
+ * - Se for um número (XLSX), converte corretamente para data.
+ * - Se já estiver no formato correto, mantém.
+ * @param {string|number} dateString - Data no formato YYYY-MM-DD, DD/MM/YYYY ou número de série do Excel.
  * @returns {string} - Data formatada como DD/MM/YYYY.
  */
 const formatDateToBR = (dateString) => {
     if (!dateString) return "";
 
     // Se já estiver no formato DD/MM/YYYY, retorna como está
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+    if (typeof dateString === "string" && /^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
         return dateString;
     }
 
-    // Converte de YYYY-MM-DD para DD/MM/YYYY
-    const [year, month, day] = dateString.split("-");
-    if (!year || !month || !day) return dateString; // Evita erro caso os valores estejam inválidos
+    // Se for um número (número de série do Excel), converte para data real
+    if (typeof dateString === "number") {
+        const excelBaseDate = new Date(1900, 0, dateString - 1);
+        return format(excelBaseDate, "dd/MM/yyyy");
+    }
 
-    return `${day}/${month}/${year}`;
+    // Se for uma string no formato YYYY-MM-DD, converte para DD/MM/YYYY
+    if (typeof dateString === "string" && dateString.includes("-")) {
+        const [year, month, day] = dateString.split("-");
+        if (!year || !month || !day) return dateString; // Evita erro caso os valores estejam inválidos
+        return `${day}/${month}/${year}`;
+    }
+
+    return dateString; // Caso não se encaixe em nenhum formato esperado
 };
 
 /**
@@ -41,7 +52,7 @@ const formatDateToBR = (dateString) => {
 const addRowToSheet = async (date, appointments) => {
     const formattedDate = formatDateToBR(date);
     try {
-        await sheets.spreadsheets.values.append({
+        dados = await sheets.spreadsheets.values.append({
             spreadsheetId: SHEET_ID,
             range: `${SHEET_NAME}!A:B`,
             valueInputOption: "USER_ENTERED",
@@ -49,7 +60,7 @@ const addRowToSheet = async (date, appointments) => {
                 values: [[formattedDate, appointments]],
             },
         });
-        console.log("Dados adicionados à planilha.");
+        console.log(JSON.stringify(dados.config.body) + " adicionados à planilha.");
     } catch (error) {
         console.error("Erro ao adicionar dados ao Google Sheets:", error);
         throw new Error("Erro ao adicionar dados ao Google Sheets.");
