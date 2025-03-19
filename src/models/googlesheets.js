@@ -14,15 +14,30 @@ const SHEET_ID = "1K6VI3mODd1nFUdZ7AzwbTiyW_tK_DXsgWV4g9fALDe4"; // ID da sua pl
 const SHEET_NAME = "Diário"; // Nome da aba
 
 /**
+ * Converte a data de YYYY-MM-DD para DD/MM/YYYY se necessário.
+ * @param {string} dateString - Data no formato YYYY-MM-DD ou DD/MM/YYYY.
+ * @returns {string} - Data formatada como DD/MM/YYYY.
+ */
+const formatDateToBR = (dateString) => {
+    if (!dateString) return "";
+
+    // Se já estiver no formato DD/MM/YYYY, retorna como está
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+        return dateString;
+    }
+
+    // Converte de YYYY-MM-DD para DD/MM/YYYY
+    const [year, month, day] = dateString.split("-");
+    if (!year || !month || !day) return dateString; // Evita erro caso os valores estejam inválidos
+
+    return `${day}/${month}/${year}`;
+};
+
+/**
  * Adiciona uma nova linha na planilha.
  * @param {string} date - Data do agendamento (Formato YYYY-MM-DD).
  * @param {number} appointments - Número de agendamentos.
  */
-const formatDateToBR = (dateString) => {
-    if (!dateString) return "";
-    const [year, month, day] = dateString.split("-");
-    return `${day}/${month}/${year}`;
-};
 const addRowToSheet = async (date, appointments) => {
     const formattedDate = formatDateToBR(date);
     try {
