@@ -399,8 +399,10 @@ const censorEmailList = async (emailLists) => {
   
     await Promise.all(
       emailList.map(async (email) => {
-        let censoredEmail;
+        if(email)
+        {let censoredEmail;
         let newEmail = false;
+        
         do {
           const checkDB = await client.emails.findFirst({
             where: {
@@ -422,7 +424,7 @@ const censorEmailList = async (emailLists) => {
               email: email,
             },
           });
-        }
+        }}
       })
     );
   
