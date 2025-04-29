@@ -12,6 +12,7 @@ loginRouter.get("/test-login-api",constrollerAuth.testLoginApi)
 // C
 loginRouter.post("/newUser", constrollerAuth.newUser);
 loginRouter.post("/createUser", constrollerAuth.createUser);
+loginRouter.post("/update-email", constrollerAuth.updateEmail);
 
 // R
 loginRouter.post("/login", constrollerAuth.login);
