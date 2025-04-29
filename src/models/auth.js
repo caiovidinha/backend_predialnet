@@ -237,6 +237,37 @@ const generatePasswordToken = async (userId) => {
     return passToken;
 };
 
+const updateEmailOnUAIPI = async ({ email, codcliente, inscricao }) => {
+    const token = await loginAPI();
+  
+    try {
+      const response = await instance.post(
+        `https://uaipi.predialnet.com.br/v1/clientes/${codcliente}/set-email`,
+        {
+          email,
+          codcliente,
+          inscricao,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+  
+      if (response.status !== 200) {
+        console.error("Erro ao atualizar e-mail na UAIPI:", response.data);
+        return { error: "Falha ao atualizar e-mail" };
+      }
+  
+      return { success: true };
+    } catch (err) {
+      console.error("Erro de conexão com a UAIPI:", err.response?.data || err);
+      return { error: "Erro de conexão com a UAIPI" };
+    }
+  };
+  
+
 
 const validateJWT = (req, res, next) => {
     const token = req.headers["x-access-token"];
@@ -447,5 +478,6 @@ module.exports = {
     getUsersByCPF,
     sendEmail,
     censorEmailList,
-    getCorrectEmail
+    getCorrectEmail,
+    updateEmailOnUAIPI
 };

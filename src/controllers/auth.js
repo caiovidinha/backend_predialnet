@@ -8,7 +8,8 @@ const {
     getUsers,
     sendEmail,
     censorEmailList,
-    getCorrectEmail
+    getCorrectEmail,
+    updateEmailOnUAIPI 
 } = require("../models/auth");
 const { z } = require("zod");
 const { hash, compare } = require("bcryptjs");
@@ -59,11 +60,9 @@ testLoginApi = async (request, response) => {
 newUser = async (req, res) => {
     const { userCredential } = req.body;
 
-    //checar se é cliente Predialnet
     const users = await getUsers(userCredential);
     if(!users)  return res.status(404).json({ error: "Não é cliente predialnet" });
 
-     //checar se já tem conta no aplicativo
     const userAlreadyExists = await client.user.findFirst({
         where: {
             cpf: users.cpf,
@@ -81,6 +80,27 @@ newUser = async (req, res) => {
         emails: Array.from(finalEmails), 
         inscricao: users.cpf
 });   
+};
+
+updateEmail = async (req, res) => {
+    const { email, codcliente, inscricao } = req.body;
+
+    if (!email || !codcliente || !inscricao) {
+        return res.status(400).json({ error: "Campos obrigatórios não preenchidos." });
+    }
+
+    try {
+        const result = await updateEmailOnUAIPI({ email, codcliente, inscricao });
+
+        if (result.error) {
+            return res.status(500).json({ error: result.error });
+        }
+
+        return res.status(200).json({ message: "E-mail atualizado com sucesso na base da Predialnet." });
+    } catch (error) {
+        console.error("Erro ao atualizar e-mail:", error);
+        return res.status(500).json({ error: "Erro interno ao atualizar e-mail." });
+    }
 };
 
 createUser = async(req, res) => {
@@ -314,5 +334,6 @@ module.exports = {
     resetPassword,
     testLoginApi,
     createUser,
-    handleEmail
+    handleEmail,
+    updateEmail
 };
