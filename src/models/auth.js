@@ -269,13 +269,20 @@ const updateEmailOnUAIPI = async ({ email, codcliente, inscricao }) => {
   
 
 
-const validateJWT = (req, res, next) => {
+const validateJWT = async (req, res, next) => {
     const token = req.headers["x-access-token"];
 
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, async (err, decoded) => {
         if (err) return res.status(401).end();
 
-        req.cpf = decoded.cpf;
+        const user = await client.user.findUnique({
+            where: { id: decoded.userId },
+        });
+
+        if (!user) return res.status(401).end();
+
+        req.userId = user.id;
+        req.cpf = user.cpf;
         next();
     });
 };

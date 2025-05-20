@@ -7,7 +7,6 @@ const { validateJWT } = require("../models/auth");
 const loginRouter = express.Router();
 
 loginRouter.get("/ping", cors(), constrollerAuth.getOk);
-loginRouter.get("/test-login-api",constrollerAuth.testLoginApi)
 
 // C
 loginRouter.post("/newUser", constrollerAuth.newUser);

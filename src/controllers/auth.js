@@ -193,9 +193,6 @@ login = async (req, res) => {
             clienteAtivo
         });
     } catch (error) {
-        if(req.body.credential == "19242536741") { 
-            
-        }
         return res.status(403).json({ error: "Não é um cliente predialnet" });
     }
     

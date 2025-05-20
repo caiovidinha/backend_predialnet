@@ -3,6 +3,7 @@ const utilitiesController = require("../controllers/utilities")
 const express = require("express");
 
 const utilitiesRouter = express.Router();
+utilitiesRouter.use(validateJWT);
 
 utilitiesRouter.get("/toggle-ad/:cpf", utilitiesController.toggleShowAd);
 utilitiesRouter.get("/cliente/:id", utilitiesController.getUserByID);
