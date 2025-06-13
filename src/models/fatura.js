@@ -130,6 +130,7 @@ const getPixFromLastOpenInternetInvoice = async (id) => {
         }
         
         const lastOpenInternetFatura = openInternetFaturas[0];
+	console.log(lastOpenInternetFatura);
         return { pix: lastOpenInternetFatura.pix }; // Ajuste o campo 'pix' conforme a estrutura real da fatura
     } catch (error) {
         console.error('Erro ao obter PIX da última fatura em aberto:', error.message);

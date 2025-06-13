@@ -110,7 +110,8 @@ const updateSerAdicionalModel = async (id_seradicional, data) => {
         },
       });
       // Return the response data
-      return response.data;
+      	console.log(response.data);
+	return response.data;
     } catch (error) {
       console.error('Error updating ser_adicional:', error.response?.data || error.message);
       throw error;
