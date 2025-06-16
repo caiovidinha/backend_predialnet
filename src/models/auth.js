@@ -1,9 +1,12 @@
+// models/auth.js
+
 const axios = require("axios");
 const https = require("https");
 const dotenv = require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const { client } = require("../prisma/client");
 const dayjs = require("dayjs");
+const logger = require("../utils/logger");
 
 const instance = axios.create({
     httpsAgent: new https.Agent({
@@ -11,155 +14,57 @@ const instance = axios.create({
     }),
 });
 
-const standardUser = [
-    {
-        cpf: "19242536741",
-        cNumber: "123456",
-        email: "caiomdavidinha@gmail.com",
-    },
-    {
-        cpf: "19242536741",
-        cNumber: "234567",
-        email: "caiomdavidinha2@gmail.com",
-    },
-    {
-        cpf: "19242536741",
-        cNumber: "345678",
-        email: "caiomdavidinha3@gmail.com",
-    },
-    { cpf: "19242536742", cNumber: "012345", email: "caiovidinha@gmail.com" },
-    { cpf: "19242536742", cNumber: "567890", email: "caiovidinha2@gmail.com" },
-    { cpf: "19242536742", cNumber: "678901", email: "caiovidinha3@gmail.com" },
-    { cpf: "19242536743", cNumber: "678910", email: "joao.silva@gmail.com" },
-    { cpf: "19242536743", cNumber: "789012", email: "joao.silva2@gmail.com" },
-    {
-        cpf: "19242536744",
-        cNumber: "111213",
-        email: "maria.oliveira@gmail.com",
-    },
-    {
-        cpf: "19242536744",
-        cNumber: "890123",
-        email: "maria.oliveira2@gmail.com",
-    },
-    { cpf: "19242536745", cNumber: "141516", email: "ana.souza@gmail.com" },
-    { cpf: "19242536745", cNumber: "901234", email: "ana.souza2@gmail.com" },
-    { cpf: "19242536746", cNumber: "171819", email: "pedro.almeida@gmail.com" },
-    {
-        cpf: "19242536746",
-        cNumber: "012345",
-        email: "pedro.almeida2@gmail.com",
-    },
-    {
-        cpf: "19242536747",
-        cNumber: "202122",
-        email: "claudia.pereira@gmail.com",
-    },
-    {
-        cpf: "19242536747",
-        cNumber: "234567",
-        email: "claudia.pereira2@gmail.com",
-    },
-    { cpf: "19242536748", cNumber: "232425", email: "bruno.martins@gmail.com" },
-    {
-        cpf: "19242536748",
-        cNumber: "345678",
-        email: "bruno.martins2@gmail.com",
-    },
-    {
-        cpf: "19242536749",
-        cNumber: "262728",
-        email: "rafaela.fernandes@gmail.com",
-    },
-    {
-        cpf: "19242536749",
-        cNumber: "567890",
-        email: "rafaela.fernandes2@gmail.com",
-    },
-    {
-        cpf: "19242536750",
-        cNumber: "293031",
-        email: "lucas.rodrigues@gmail.com",
-    },
-    {
-        cpf: "19242536750",
-        cNumber: "678901",
-        email: "lucas.rodrigues2@gmail.com",
-    },
-    {
-        cpf: "19242536751",
-        cNumber: "303132",
-        email: "mariana.santos@gmail.com",
-    },
-    {
-        cpf: "19242536751",
-        cNumber: "789012",
-        email: "mariana.santos2@gmail.com",
-    },
-    {
-        cpf: "19242536752",
-        cNumber: "313233",
-        email: "fernando.silva@gmail.com",
-    },
-    {
-        cpf: "19242536752",
-        cNumber: "890123",
-        email: "fernando.silva2@gmail.com",
-    },
-    { cpf: "19242536753", cNumber: "323334", email: "juliana.alves@gmail.com" },
-    {
-        cpf: "19242536753",
-        cNumber: "901234",
-        email: "juliana.alves2@gmail.com",
-    },
-    { cpf: "19242536754", cNumber: "333435", email: "roberto.costa@gmail.com" },
-    {
-        cpf: "19242536754",
-        cNumber: "012345",
-        email: "roberto.costa2@gmail.com",
-    },
-];
-
 require("dotenv").config();
 
-const loginAPI = async() => {
-    const data = {   
+const loginAPI = async () => {
+    const data = {
         "email": process.env.API_LOGIN,
         "password": process.env.API_PASS
-    }
-    const JWT = await instance.post('https://uaipi.predialnet.com.br/v1/auth/login',data)
-    return JWT.data.data.access_token
-}
+    };
+    const JWT = await instance.post('https://uaipi.predialnet.com.br/v1/auth/login', data);
+    return JWT.data.data.access_token;
+};
 
-const sendEmail = async(to,subject,content) => {
-    let data = {}
-    if(to=="comercial@predialnet.com.br")
-    {
+const sendEmail = async (to, subject, content) => {
+    let data = {};
+    if (to == "comercial@predialnet.com.br") {
         data = {
             "to": to,
             "subject": subject,
             "htmlContent": content,
             "cc": ["predialnet@predialnet.com.br"]
-        }   
-    }else{
+        };
+    } else {
         data = {
             "to": to,
             "subject": subject,
             "htmlContent": content,
             "cc": []
-        }  
+        };
     }
-    const token = await loginAPI()
-    const email = await instance.post('https://uaipi.predialnet.com.br/v1/enviar-email',data,{
-        headers: {
-            'Authorization': `Bearer ${token}`
-            }
-        })
-    if(!email) return {error: "Erro ao enviar o e-mail"}
-    console.log(email)
-    return email
-}
 
+    try {
+        const token = await loginAPI();
+        const email = await instance.post('https://uaipi.predialnet.com.br/v1/enviar-email', data, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (!email) {
+            logger.error("Falha ao enviar o e-mail, resposta indefinida", { to, subject });
+            return { error: "Erro ao enviar o e-mail" };
+        }
+        return email;
+    } catch (error) {
+        logger.error("Erro ao enviar e-mail via UAIPI", {
+            to,
+            subject,
+            error: error.message,
+            response: error.response?.data
+        });
+        return { error: "Erro ao enviar o e-mail" };
+    }
+};
 
 const passwordExistsInDatabase = async (password) => {
     const user = await client.user.findFirst({
@@ -170,7 +75,6 @@ const passwordExistsInDatabase = async (password) => {
     if (!user) return false;
     return true;
 };
-
 
 const createToken = async (userId) => {
     const token = jwt.sign(
@@ -189,7 +93,6 @@ const createToken = async (userId) => {
     return { token, refreshToken };
 };
 
-
 const refreshJWT = async (userId) => {
     const token = jwt.sign(
         { userId: userId },
@@ -200,7 +103,6 @@ const refreshJWT = async (userId) => {
     );
     return token;
 };
-
 
 const generateRefreshToken = async (userId) => {
     const expiresIn = dayjs().add(15, "sec").unix();
@@ -239,35 +141,41 @@ const generatePasswordToken = async (userId) => {
 
 const updateEmailOnUAIPI = async ({ email, codcliente, inscricao }) => {
     const token = await loginAPI();
-  
-    try {
-      const response = await instance.post(
-        `https://uaipi.predialnet.com.br/v1/clientes/${codcliente}/set-email`,
-        {
-          email,
-          codcliente,
-          inscricao,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-  
-      if (response.status !== 200) {
-        console.error("Erro ao atualizar e-mail na UAIPI:", response.data);
-        return { error: "Falha ao atualizar e-mail" };
-      }
-  
-      return { success: true };
-    } catch (err) {
-      console.error("Erro de conexão com a UAIPI:", err.response?.data || err);
-      return { error: "Erro de conexão com a UAIPI" };
-    }
-  };
-  
 
+    try {
+        const response = await instance.post(
+            `https://uaipi.predialnet.com.br/v1/clientes/${codcliente}/set-email`,
+            {
+                email,
+                codcliente,
+                inscricao,
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            }
+        );
+
+        if (response.status !== 200) {
+            logger.error("Erro ao atualizar e-mail na UAIPI", {
+                codcliente,
+                status: response.status,
+                data: response.data
+            });
+            return { error: "Falha ao atualizar e-mail" };
+        }
+
+        return { success: true };
+    } catch (err) {
+        logger.error("Erro de conexão com a UAIPI ao atualizar e-mail", {
+            codcliente,
+            error: err.message,
+            response: err.response?.data
+        });
+        return { error: "Erro de conexão com a UAIPI" };
+    }
+};
 
 const validateJWT = async (req, res, next) => {
     const token = req.headers["x-access-token"];
@@ -287,21 +195,23 @@ const validateJWT = async (req, res, next) => {
     });
 };
 
-
 const getUsersByCPF = async (credential) => {
-    const token = await loginAPI()
+    const token = await loginAPI();
     try {
         const list = await axios.get(`https://uaipi.predialnet.com.br/v1/clientes/${credential}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
-                }
-            })  
-        return(list.data.data)
+            }
+        });
+        return (list.data.data);
     } catch (error) {
-        return false
+        logger.error("Erro ao buscar usuário por CPF na UAIPI", {
+            credential,
+            error: error.message,
+            response: error.response?.data
+        });
+        return false;
     }
-         
-    
 };
 
 const refreshTokenRegenerate = async (refresh_token) => {
@@ -328,28 +238,17 @@ const refreshTokenRegenerate = async (refresh_token) => {
 };
 
 const getUsers = async (userCredential) => {
-    let users = []
+    let users = [];
     users = await getUsersByCPF(userCredential);
-    if(!users) return false
-    const cpf = users[0].cliente.inscricao
-    const email = users[0].cliente.email
-    const nome = users[0].cliente.nome
+    if (!users) return false;
+    const cpf = users[0].cliente.inscricao;
+    const email = users[0].cliente.email;
+    const nome = users[0].cliente.nome;
     return {
         users,
         nome,
         cpf,
         email
-    };
-};
-
-const getUsersByEmail = async (email) => {
-    let users = [];
-    const firstUser = standardUser.find((user) => user.email === email);
-    if (!firstUser) return false;
-    return {
-        cpf: firstUser.cpf,
-        email: firstUser.email,
-        registros: users,
     };
 };
 
@@ -363,19 +262,15 @@ const generatePassword = () => {
         return charSet[Math.floor(Math.random() * charSet.length)];
     }
 
-    const length = Math.floor(Math.random() * 3) + 12; // Random length between 12 and 14
+    const length = Math.floor(Math.random() * 3) + 12;
     let password = "";
 
-    // Ensure at least one of each required character type
     password += getRandomChar(lowerChars);
     password += getRandomChar(upperChars);
     password += getRandomChar(numbers);
     password += getRandomChar(specialChars);
 
-    // Limit to 3 special characters
     let specialCharCount = 1;
-
-    // Fill the rest of the password length with random characters from all sets
     const allChars = lowerChars + upperChars + numbers + specialChars;
     while (password.length < length) {
         let char = getRandomChar(allChars);
@@ -389,7 +284,6 @@ const generatePassword = () => {
         }
     }
 
-    // Shuffle the password to ensure randomness
     password = password
         .split("")
         .sort(() => 0.5 - Math.random())
@@ -401,7 +295,7 @@ const censorEmail = (email) => {
     const [localPart, domain] = email.split("@");
     const censorLocalPart = (localPart) => {
         const localArr = localPart.split('');
-        const numCharsToCensor = Math.max(1, Math.floor(localPart.length * 0.5)); // Censura metade dos caracteres, no mínimo 1
+        const numCharsToCensor = Math.max(1, Math.floor(localPart.length * 0.5));
 
         let censoredIndices = new Set();
         while (censoredIndices.size < numCharsToCensor) {
@@ -410,14 +304,14 @@ const censorEmail = (email) => {
         }
 
         censoredIndices.forEach(index => {
-            localArr[index] = '*'; // Substitui o caractere por '*'
+            localArr[index] = '*';
         });
 
         return localArr.join('');
     };
     const censoredLocalPart = censorLocalPart(localPart);
 
-    const cEmail = `${censoredLocalPart}@${domain}`
+    const cEmail = `${censoredLocalPart}@${domain}`;
     return cEmail;
 };
 
@@ -426,48 +320,49 @@ const getCorrectEmail = async (censoredEmail) => {
         where: {
             censoredEmail: censoredEmail
         }
-    })
+    });
     return correctEmail.email;
-}
+};
 
 const censorEmailList = async (emailLists) => {
     let censoredEmails = new Set();
     const unicos = new Set(emailLists);
     const emailList = Array.from(unicos);
-  
+
     await Promise.all(
-      emailList.map(async (email) => {
-        if(email)
-        {let censoredEmail;
-        let newEmail = false;
-        
-        do {
-          const checkDB = await client.emails.findFirst({
-            where: {
-              email: email,
-            },
-          });
-          if (checkDB == null) {
-            censoredEmail = censorEmail(email);
-            newEmail = true;
-          } else {
-            censoredEmail = checkDB.censoredEmail;
-          }
-        } while (censoredEmails.has(censoredEmail)); // Garante que o censurado seja único
-        censoredEmails.add(censoredEmail);
-        if (newEmail) {
-          await client.emails.create({
-            data: {
-              censoredEmail: censoredEmail,
-              email: email,
-            },
-          });
-        }}
-      })
+        emailList.map(async (email) => {
+            if (email) {
+                let censoredEmail;
+                let newEmail = false;
+
+                do {
+                    const checkDB = await client.emails.findFirst({
+                        where: {
+                            email: email,
+                        },
+                    });
+                    if (checkDB == null) {
+                        censoredEmail = censorEmail(email);
+                        newEmail = true;
+                    } else {
+                        censoredEmail = checkDB.censoredEmail;
+                    }
+                } while (censoredEmails.has(censoredEmail));
+                censoredEmails.add(censoredEmail);
+                if (newEmail) {
+                    await client.emails.create({
+                        data: {
+                            censoredEmail: censoredEmail,
+                            email: email,
+                        },
+                    });
+                }
+            }
+        })
     );
-  
+
     return censoredEmails;
-  };
+};
 
 module.exports = {
     getUsers,
@@ -479,7 +374,6 @@ module.exports = {
     validateJWT,
     generateRefreshToken,
     refreshTokenRegenerate,
-    getUsersByEmail,
     generatePasswordToken,
     loginAPI,
     getUsersByCPF,
