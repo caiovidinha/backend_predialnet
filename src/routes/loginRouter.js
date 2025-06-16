@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const constrollerAuth = require("../controllers/auth");
-const constrollerInfo = require("../controllers/userInfo");
 const controllerRefreshToken = require("../controllers/refreshToken");
 // const { validateJWT } = require("../models/auth");
 const loginRouter = express.Router();
