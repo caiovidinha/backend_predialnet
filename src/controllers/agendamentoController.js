@@ -1,7 +1,7 @@
 const multer = require("multer");
 const xlsx = require("xlsx");
 const { addRowToSheet } = require("../models/googlesheets");
-const logger = require("../utils/logger"); // <- ADICIONADO
+const logger = require("../utils/logger"); // ✅ adicionado
 
 // Configuração do Multer para upload de arquivos
 const upload = multer({ dest: "uploads/" });
@@ -11,49 +11,52 @@ const upload = multer({ dest: "uploads/" });
  * Suporta JSON (individual) e arquivos CSV/XLSX (múltiplos).
  */
 const processAgendamento = async (req, res) => {
-  try {
-    if (req.file) {
-      const filePath = req.file.path;
-      const workbook = xlsx.readFile(filePath);
-      const sheetName = workbook.SheetNames[0];
-      const sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+    try {
+        if (req.file) {
+            // Se for um arquivo, processa o upload
+            const filePath = req.file.path;
+            const workbook = xlsx.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
 
-      logger.info("📊 Dados extraídos do CSV/XLSX", { preview: sheetData.slice(0, 5) });
+            logger.info("📊 Dados extraídos do CSV/XLSX:", { data: sheetData });
 
-      let processedRows = 0;
+            let processedRows = 0;
 
-      for await (const row of sheetData) {
-        const date = row[0];
-        const appointments = row[1];
+            // Processa cada linha **um por vez**, garantindo que o Google Sheets não sobrescreva nada
+            for await (const row of sheetData) {
+                const date = row[0]; // Coluna A (Data)
+                const appointments = row[1]; // Coluna B (Número de agendamentos)
 
-        if (date && !isNaN(appointments)) {
-          await addRowToSheet(date, parseInt(appointments));
-          processedRows++;
+                // Verifica se a linha é válida
+                if (date && !isNaN(appointments)) {
+                    await addRowToSheet(date, parseInt(appointments));
+                    processedRows++;
+                } else {
+                    logger.warn(`⚠️ Linha ignorada (inválida): ${JSON.stringify(row)}`);
+                }
+            }
+
+            logger.info(`✅ ${processedRows} linhas processadas com sucesso.`);
+            res.status(200).json({ message: `📊 ${processedRows} registros adicionados à planilha!` });
         } else {
-          logger.warn("⚠️ Linha ignorada (inválida)", { linha: row });
+            // Se for JSON, processa a entrada manual
+            const { date, appointments } = req.body;
+
+            if (!date || isNaN(appointments)) {
+                return res.status(400).json({ error: "❌ Dados inválidos. Envie uma data e um número de agendamentos." });
+            }
+
+            await addRowToSheet(date, parseInt(appointments));
+            res.status(200).json({ message: "📅 Agendamento registrado com sucesso!" });
         }
-      }
-
-      logger.info("✅ Linhas processadas", { count: processedRows });
-      res.status(200).json({ message: `📊 ${processedRows} registros adicionados à planilha!` });
-    } else {
-      const { date, appointments } = req.body;
-
-      if (!date || isNaN(appointments)) {
-        return res.status(400).json({ error: "❌ Dados inválidos. Envie uma data e um número de agendamentos." });
-      }
-
-      await addRowToSheet(date, parseInt(appointments));
-      logger.info("📅 Agendamento manual registrado", { date, appointments });
-      res.status(200).json({ message: "📅 Agendamento registrado com sucesso!" });
+    } catch (error) {
+        logger.error("❌ Erro ao processar agendamento:", { error: error.message });
+        res.status(500).json({ error: "Erro interno ao processar os agendamentos." });
     }
-  } catch (error) {
-    logger.error("❌ Erro ao processar agendamento", { error: error.message });
-    res.status(500).json({ error: "Erro interno ao processar os agendamentos." });
-  }
 };
 
 module.exports = {
-  upload,
-  processAgendamento,
+    upload,
+    processAgendamento,
 };
