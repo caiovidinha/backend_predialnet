@@ -1,6 +1,7 @@
 // models/fatura.js
 
 const axios = require('axios');
+const logger = require("../utils/logger");
 require('dotenv').config();
 
 /**
@@ -16,7 +17,10 @@ const loginAPI = async () => {
         const response = await axios.post('https://uaipi.predialnet.com.br/v1/auth/login', data);
         return response.data.data.access_token;
     } catch (error) {
-        console.error('Erro ao fazer login na API:', error.response ? error.response.data : error.message);
+        logger.error('Erro ao fazer login na API', {
+            error: error.message,
+            response: error.response?.data
+        });
         throw new Error('Não foi possível autenticar com a API externa.');
     }
 };
@@ -37,7 +41,11 @@ const fetchFaturas = async (id) => {
         // Ajuste: A lista de faturas está dentro de response.data.data
         return response.data.data; // Retorna o array de faturas
     } catch (error) {
-        console.error('Erro ao buscar faturas:', error.response ? error.response.data : error.message);
+        logger.error('Erro ao buscar faturas', {
+            id,
+            error: error.message,
+            response: error.response?.data
+        });
         throw new Error('Não foi possível buscar as faturas.');
     }
 };
@@ -50,7 +58,6 @@ const fetchFaturas = async (id) => {
 const getSecondCopyLink = async (id, boleta) => {
     try {
         const faturas = await fetchFaturas(id);
-        // Filtra as faturas do tipo "internet" e ordena por data de emissão desc
         const internetFaturas = faturas
             .filter(fatura => fatura.tipo.toLowerCase() === 'internet')
             .sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
@@ -60,13 +67,16 @@ const getSecondCopyLink = async (id, boleta) => {
         }
         
         const lastInternetFatura = internetFaturas.filter(fatura => fatura.boleta == boleta);
-        return { link: lastInternetFatura[0].link }; // Ajuste o campo 'link' conforme a estrutura real da fatura
+        return { link: lastInternetFatura[0].link };
     } catch (error) {
-        console.error('Erro ao obter 2ª via da fatura:', error.message);
+        logger.error('Erro ao obter 2ª via da fatura', {
+            id,
+            boleta,
+            error: error.message
+        });
         throw error;
     }
 };
-
 
 /**
  * Função para obter o histórico das últimas 6 faturas.
@@ -76,13 +86,15 @@ const getSecondCopyLink = async (id, boleta) => {
 const getLastSixInvoices = async (id) => {
     try {
         const faturas = await fetchFaturas(id);
-        // Ordena as faturas por data de emissão desc
         const sortedFaturas = faturas.sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
         const internetFaturas = sortedFaturas.filter(fatura => fatura.tipo.toLowerCase() === 'internet');
         const lastSixFaturas = internetFaturas.slice(0, 6);
         return { faturas: lastSixFaturas };
     } catch (error) {
-        console.error('Erro ao obter histórico das faturas:', error.message);
+        logger.error('Erro ao obter histórico das faturas', {
+            id,
+            error: error.message
+        });
         throw error;
     }
 };
@@ -100,10 +112,14 @@ const setFaturaDigital = async (id, data) => {
                 'Authorization': `Bearer ${token}`
             }
         });
-        console.log(response.data)
         return response.data;
     } catch (error) {
-        console.error('Erro ao atualizar fatura:', error.response ? error.response.data : error.message);
+        logger.error('Erro ao atualizar fatura digital', {
+            id,
+            data,
+            error: error.message,
+            response: error.response?.data
+        });
         throw new Error('Não foi possível buscar as faturas.');
     }
 };
@@ -116,7 +132,6 @@ const setFaturaDigital = async (id, data) => {
 const getPixFromLastOpenInternetInvoice = async (id) => {
     try {
         const faturas = await fetchFaturas(id);
-        // Filtra as faturas do tipo "internet" que estão em aberto (sem data de pagamento e vencimento >= hoje)
         const today = new Date();
         const openInternetFaturas = faturas
             .filter(fatura => 
@@ -130,9 +145,12 @@ const getPixFromLastOpenInternetInvoice = async (id) => {
         }
         
         const lastOpenInternetFatura = openInternetFaturas[0];
-        return { pix: lastOpenInternetFatura.pix }; // Ajuste o campo 'pix' conforme a estrutura real da fatura
+        return { pix: lastOpenInternetFatura.pix };
     } catch (error) {
-        console.error('Erro ao obter PIX da última fatura em aberto:', error.message);
+        logger.error('Erro ao obter PIX da última fatura em aberto', {
+            id,
+            error: error.message
+        });
         throw error;
     }
 };
@@ -145,7 +163,6 @@ const getPixFromLastOpenInternetInvoice = async (id) => {
 const checkCurrentInvoiceStatus = async (id) => {
     try {
         const faturas = await fetchFaturas(id);
-        // Supondo que a "fatura atual" seja a mais recente
         const sortedFaturas = faturas.sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
         
         if (sortedFaturas.length === 0) {
@@ -165,7 +182,10 @@ const checkCurrentInvoiceStatus = async (id) => {
         
         return { status: status };
     } catch (error) {
-        console.error('Erro ao verificar status da fatura atual:', error.message);
+        logger.error('Erro ao verificar status da fatura atual', {
+            id,
+            error: error.message
+        });
         throw error;
     }
 };
@@ -178,7 +198,6 @@ const checkCurrentInvoiceStatus = async (id) => {
 const getCurrentInvoice = async (id) => {
     try {
         const faturas = await fetchFaturas(id);
-        // Ordena as faturas por data de emissão desc
         const sortedFaturas = faturas.sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
         
         if (sortedFaturas.length === 0) {
@@ -188,7 +207,10 @@ const getCurrentInvoice = async (id) => {
         const currentFatura = sortedFaturas[0];
         return { faturaAtual: currentFatura };
     } catch (error) {
-        console.error('Erro ao obter fatura atual:', error.message);
+        logger.error('Erro ao obter fatura atual', {
+            id,
+            error: error.message
+        });
         throw error;
     }
 };
@@ -202,10 +224,7 @@ const getCurrentInvoice = async (id) => {
 const cadastrarLibtemp = async (codcliente, prazo) => {
     try {
         const token = await loginAPI();
-        const payload = {
-            codcliente: codcliente,
-            prazo: prazo
-        };
+        const payload = { codcliente, prazo };
         const response = await axios.post('https://uaipi.predialnet.com.br/v1/libtemp', payload, {
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -213,15 +232,15 @@ const cadastrarLibtemp = async (codcliente, prazo) => {
                 'Content-Type': 'application/json'
             }
         });
-        
-        return response.data; // { message, status, data }
+        return response.data;
     } catch (error) {
-        console.error('Erro ao cadastrar liberação temporária:', error.response ? error.response.data : error.message);
-        if (error.response && error.response.data && error.response.data.message) {
-            throw new Error(error.response.data.message);
-        } else {
-            throw new Error('Erro ao cadastrar liberação temporária.');
-        }
+        logger.error('Erro ao cadastrar liberação temporária', {
+            codcliente,
+            prazo,
+            error: error.message,
+            response: error.response?.data
+        });
+        throw new Error(error.response?.data?.message || 'Erro ao cadastrar liberação temporária.');
     }
 };
 
@@ -240,14 +259,14 @@ const consultarLibtempPorCliente = async (codcliente) => {
                 'Content-Type': 'application/json'
             }
         });
-        return response.data; // { message, status, data }
+        return response.data;
     } catch (error) {
-        console.error('Erro ao consultar liberação temporária:', error.response ? error.response.data : error.message);
-        if (error.response && error.response.data && error.response.data.message) {
-            throw new Error(error.response.data.message);
-        } else {
-            throw new Error('Erro ao consultar liberação temporária.');
-        }
+        logger.error('Erro ao consultar liberação temporária', {
+            codcliente,
+            error: error.message,
+            response: error.response?.data
+        });
+        throw new Error(error.response?.data?.message || 'Erro ao consultar liberação temporária.');
     }
 };
 
@@ -266,14 +285,14 @@ const deletarLibtemp = async (id) => {
                 'Content-Type': 'application/json'
             }
         });
-        return response.data; // { message, status, data }
+        return response.data;
     } catch (error) {
-        console.error('Erro ao deletar liberação temporária:', error.response ? error.response.data : error.message);
-        if (error.response && error.response.data && error.response.data.message) {
-            throw new Error(error.response.data.message);
-        } else {
-            throw new Error('Erro ao deletar liberação temporária.');
-        }
+        logger.error('Erro ao deletar liberação temporária', {
+            id,
+            error: error.message,
+            response: error.response?.data
+        });
+        throw new Error(error.response?.data?.message || 'Erro ao deletar liberação temporária.');
     }
 };
 
@@ -282,9 +301,9 @@ module.exports = {
     getLastSixInvoices,
     getPixFromLastOpenInternetInvoice,
     checkCurrentInvoiceStatus,
-    getCurrentInvoice, // Adicionado
-    cadastrarLibtemp, // Adicionado
-    consultarLibtempPorCliente, // Adicionado
-    deletarLibtemp, // Adicionado
+    getCurrentInvoice,
+    cadastrarLibtemp,
+    consultarLibtempPorCliente,
+    deletarLibtemp,
     setFaturaDigital
 };
