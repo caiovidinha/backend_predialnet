@@ -6,6 +6,8 @@ const testRouter = require("./routes/testRouter");
 const faturaRouter = require("./routes/faturaRouter");
 const utilitiesRouter = require("./routes/utilitiesRouter");
 const agendamentoRouter = require("./routes/agendamentoRouter");
+const pushRouter = require("./routes/pushRouter");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -18,5 +20,6 @@ app.use("/fatura", faturaRouter);
 app.use("/utils", utilitiesRouter);
 app.use("/utils", utilitiesRouter);
 app.use("/agendamento", agendamentoRouter);
+app.use("/push", pushRouter);
 
 module.exports = app;
