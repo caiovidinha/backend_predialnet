@@ -1,5 +1,9 @@
 const express = require("express");
 const cors = require("cors");
+require('dd-trace').init({
+  logInjection: true
+});
+
 const requestIntercepter = require("./utils/requestIntercepter");
 const loginRouter = require("./routes/loginRouter");
 const testRouter = require("./routes/testRouter");
@@ -7,6 +11,7 @@ const faturaRouter = require("./routes/faturaRouter");
 const utilitiesRouter = require("./routes/utilitiesRouter");
 const agendamentoRouter = require("./routes/agendamentoRouter");
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
