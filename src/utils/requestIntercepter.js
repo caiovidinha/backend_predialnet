@@ -8,7 +8,6 @@ const requestIntercepter = (req, res, next) => {
       status: res.statusCode,
       body: req.body,
       query: req.query,
-      userId: req.userId, // opcional se tiver auth
     });
   });
 
