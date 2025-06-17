@@ -1,5 +1,10 @@
+require('dd-trace').init({
+  logInjection: true
+});
+
 const express = require("express");
 const cors = require("cors");
+
 const requestIntercepter = require("./utils/requestIntercepter");
 const loginRouter = require("./routes/loginRouter");
 const testRouter = require("./routes/testRouter");
@@ -9,6 +14,7 @@ const agendamentoRouter = require("./routes/agendamentoRouter");
 const pushRouter = require("./routes/pushRouter");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -17,7 +23,6 @@ app.all("*", requestIntercepter);
 app.use("/", loginRouter);
 app.use("/test", testRouter);
 app.use("/fatura", faturaRouter);
-app.use("/utils", utilitiesRouter);
 app.use("/utils", utilitiesRouter);
 app.use("/agendamento", agendamentoRouter);
 app.use("/push", pushRouter);

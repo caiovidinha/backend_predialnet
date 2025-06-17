@@ -1,7 +1,8 @@
-// controllers/showAdController.js
+// controllers/utilities.js
 
+const logger = require("../utils/logger");
 const { manageShowAd } = require("../models/utilities");
-const { updateSerAdicionalModel,updateControleParentalModel, getUserByIDModel } = require("../models/utilities");
+const { updateSerAdicionalModel, updateControleParentalModel, getUserByIDModel } = require("../models/utilities");
 
 /**
  * Controlador para gerenciar a exibição de anúncios (show_ad).
@@ -16,67 +17,70 @@ const toggleShowAd = async (req, res) => {
     const cpf = params.cpf
 
     if (!cpf) {
+        logger.warn("CPF não fornecido em toggleShowAd");
         return res.status(400).json({ error: "CPF não fornecido." });
     }
 
     try {
         const result = await manageShowAd(cpf);
         
+        logger.info("toggleShowAd executado com sucesso", { cpf, show: result.show });
         return res.status(200).json({ show: result.show });
     } catch (error) {
-        
+        logger.error("Erro em toggleShowAd", { cpf, error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };
 
 const updateSerAdicionalController = async (req, res) => {
     try {
-      const { id, requerido, serPonto } = req.body;
-  
-      if (!id || requerido === undefined || !serPonto) {
-        return res.status(400).json({ error: 'Parâmetros inválidos' });
-      }
-  
-      // Chamar a função do modelo
-      const response = await updateSerAdicionalModel(id, { requerido, serPonto });
-  
-      res.status(200).json({ message: 'ser_adicional atualizado com sucesso', data: response });
+        const { id, requerido, serPonto } = req.body;
+    
+        if (!id || requerido === undefined || !serPonto) {
+            logger.warn("Parâmetros inválidos em updateSerAdicionalController", { body: req.body });
+            return res.status(400).json({ error: 'Parâmetros inválidos' });
+        }
+    
+        // Chamar a função do modelo
+        const response = await updateSerAdicionalModel(id, { requerido, serPonto });
+    
+        logger.info("ser_adicional atualizado com sucesso", { id, requerido, serPonto });
+        res.status(200).json({ message: 'ser_adicional atualizado com sucesso', data: response });
     } catch (error) {
-      console.error('Erro no controlador updateSerAdicional:', error.message);
-      res.status(500).json({ error: 'Erro ao atualizar ser_adicional' });
+        logger.error("Erro no controlador updateSerAdicional", { error: error.message });
+        res.status(500).json({ error: 'Erro ao atualizar ser_adicional' });
     }
-  };
+};
 
-  const updateControleParentalController = async (req, res) => {
+const updateControleParentalController = async (req, res) => {
     try {
-      const { id, controle_parental } = req.body;
-  
-      // Chamar a função do modelo
-      const response = await updateControleParentalModel(id, { controle_parental });
-  
-      res.status(200).json({ message: 'Controle Parental atualizado com sucesso', data: response });
+        const { id, controle_parental } = req.body;
+    
+        // Chamar a função do modelo
+        const response = await updateControleParentalModel(id, { controle_parental });
+    
+        logger.info("Controle Parental atualizado com sucesso", { id, controle_parental });
+        res.status(200).json({ message: 'Controle Parental atualizado com sucesso', data: response });
     } catch (error) {
-      console.error('Erro no controlador updateControleParental:', error.message);
-      res.status(500).json({ error: 'Erro ao atualizar Controle Parental' });
+        logger.error("Erro no controlador updateControleParental", { error: error.message });
+        res.status(500).json({ error: 'Erro ao atualizar Controle Parental' });
     }
-  };
+};
 
-  
-  const getUserByID = async (req, res) => {
+const getUserByID = async (req, res) => {
     try {
-      const { id } = req.params;
-
-  
-      // Chamar a função do modelo
-      const response = await getUserByIDModel(id);
-  
-      res.status(200).json({ data: response });
+        const { id } = req.params;
+    
+        // Chamar a função do modelo
+        const response = await getUserByIDModel(id);
+    
+        logger.info("getUserByID executado com sucesso", { id });
+        res.status(200).json({ data: response });
     } catch (error) {
-      console.error('Erro ao pegar usuário', error.message);
-      res.status(500).json({ error: 'Erro ao pegar usuário' });
+        logger.error("Erro ao pegar usuário", { error: error.message });
+        res.status(500).json({ error: 'Erro ao pegar usuário' });
     }
-  };
-
+};
 
 module.exports = {
     toggleShowAd,

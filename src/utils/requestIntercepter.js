@@ -1,10 +1,17 @@
+const logger = require('./logger'); // já tá em utils também, então caminho relativo direto
+
 const requestIntercepter = (req, res, next) => {
-    console.log(
-        `➡️  ${res.statusCode} ${req.method} ${
-            req.originalUrl
-        } ${JSON.stringify(req.body)}`,
-    );
-    next();
+  res.on('finish', () => {
+    logger.info(`${res.statusCode} ${req.method} ${req.originalUrl}`, {
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      body: req.body,
+      query: req.query,
+    });
+  });
+
+  next();
 };
 
 module.exports = requestIntercepter;
