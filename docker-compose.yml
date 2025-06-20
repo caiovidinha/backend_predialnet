@@ -29,14 +29,12 @@ services:
     tty: true
     stdin_open: true
     entrypoint: >
-      bash -c "
-        apt-get update &&
-        apt-get install -y cron mariadb-client &&
-        echo '0 3 * * * root mysqldump -h mysql -uadmin -padmin predialnet > /backup/db-$(date +\%F).sql' > /etc/cron.d/mysql-backup &&
-        chmod 0644 /etc/cron.d/mysql-backup &&
-        crontab /etc/cron.d/mysql-backup &&
-        cron -f
-      "
+      bash -c "apt-get update && \
+        apt-get install -y cron mariadb-client && \
+        echo '0 3 * * * root mysqldump -h mysql -uadmin -padmin predialnet > /backup/db-$$\(date +%F\).sql' > /etc/cron.d/mysql-backup && \
+        chmod 0644 /etc/cron.d/mysql-backup && \
+        crontab /etc/cron.d/mysql-backup && \
+        cron -f"
 
 volumes:
   mysql-data:
