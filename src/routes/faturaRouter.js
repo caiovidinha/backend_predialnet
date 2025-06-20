@@ -1,47 +1,183 @@
-// routes/faturaRoutes.js
-
 const express = require("express");
 const faturaController = require("../controllers/fatura");
 const router = express.Router();
-// router.use(validateJWT);
 
-// Rota para obter a 2ª via da fatura
-// Exemplo de requisição: GET /fatura/segunda-via/123e4567-e89b-12d3-a456-426614174000
+/**
+ * @swagger
+ * /fatura/segunda-via/{id}/{boleta}:
+ *   get:
+ *     summary: Obter a 2ª via da fatura
+ *     tags: [Fatura]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: boleta
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Link da 2ª via retornado com sucesso
+ */
 router.get("/segunda-via/:id/:boleta", faturaController.getSecondCopyLinkController);
 
-// Rota para obter o histórico das últimas 6 faturas
-// Exemplo de requisição: GET /fatura/historico/123e4567-e89b-12d3-a456-426614174000
+/**
+ * @swagger
+ * /fatura/historico/{id}:
+ *   get:
+ *     summary: Obter histórico das últimas 6 faturas
+ *     tags: [Fatura]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Histórico retornado com sucesso
+ */
 router.get("/historico/:id", faturaController.getLastSixInvoicesController);
 
-// Rota para obter o PIX da última fatura em aberto do tipo "internet"
-// Exemplo de requisição: GET /fatura/pix/123e4567-e89b-12d3-a456-426614174000
+/**
+ * @swagger
+ * /fatura/pix/{id}:
+ *   get:
+ *     summary: Obter PIX da última fatura em aberto
+ *     tags: [Fatura]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: PIX retornado com sucesso
+ */
 router.get("/pix/:id", faturaController.getPixFromLastOpenInternetInvoiceController);
 
-// Rota para verificar o status da fatura atual
-// Exemplo de requisição: GET /fatura/status/123e4567-e89b-12d3-a456-426614174000
+/**
+ * @swagger
+ * /fatura/status/{id}:
+ *   get:
+ *     summary: Verificar status da fatura atual
+ *     tags: [Fatura]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Status retornado com sucesso
+ */
 router.get("/status/:id", faturaController.checkCurrentInvoiceStatusController);
 
-// Rota para obter a fatura atual
-// Exemplo de requisição: GET /fatura/atual/123e4567-e89b-12d3-a456-426614174000
-router.get("/atual/:id", faturaController.getCurrentInvoiceController); // Adicionado
-
-// Rota para obter a fatura atual
-// Exemplo de requisição: GET /fatura/atual/123e4567-e89b-12d3-a456-426614174000
-router.post("/digital/:id", faturaController.setFaturaDigitalController); // Adicionado
 /**
- * Rotas de Liberação Temporária (Libtemp)
+ * @swagger
+ * /fatura/atual/{id}:
+ *   get:
+ *     summary: Obter fatura atual
+ *     tags: [Fatura]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Fatura atual retornada com sucesso
  */
+router.get("/atual/:id", faturaController.getCurrentInvoiceController);
 
-// Rota para cadastrar uma liberação temporária
-// Exemplo de requisição: POST /fatura/libtemp
+/**
+ * @swagger
+ * /fatura/digital/{id}:
+ *   post:
+ *     summary: Atualizar configuração de fatura digital
+ *     tags: [Fatura]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Configuração atualizada com sucesso
+ */
+router.post("/digital/:id", faturaController.setFaturaDigitalController);
+
+/**
+ * @swagger
+ * /fatura/libtemp:
+ *   post:
+ *     summary: Cadastrar liberação temporária
+ *     tags: [Libtemp]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               codcliente:
+ *                 type: string
+ *               prazo:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Liberação cadastrada com sucesso
+ */
 router.post("/libtemp", faturaController.cadastrarLibtempController);
 
-// Rota para consultar uma liberação temporária por codcliente
-// Exemplo de requisição: GET /fatura/libtemp/cliente/17258
+/**
+ * @swagger
+ * /fatura/libtemp/cliente/{codcliente}:
+ *   get:
+ *     summary: Consultar liberação temporária por cliente
+ *     tags: [Libtemp]
+ *     parameters:
+ *       - in: path
+ *         name: codcliente
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Consulta realizada com sucesso
+ */
 router.get("/libtemp/cliente/:codcliente", faturaController.consultarLibtempPorClienteController);
 
-// Rota para deletar uma liberação temporária por ID
-// Exemplo de requisição: DELETE /fatura/libtemp/414812
+/**
+ * @swagger
+ * /fatura/libtemp/{id}:
+ *   delete:
+ *     summary: Deletar liberação temporária por ID
+ *     tags: [Libtemp]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Liberação deletada com sucesso
+ */
 router.delete("/libtemp/:id", faturaController.deletarLibtempController);
 
 module.exports = router;
