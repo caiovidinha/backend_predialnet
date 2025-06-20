@@ -12,6 +12,8 @@ const {
     setFaturaDigital
 } = require("../models/fatura");
 
+const logger = require("../utils/logger"); // ✅ logger adicionado
+
 /**
  * Controlador para obter a 2ª via da fatura.
  * @param {Object} req - Objeto de requisição do Express.
@@ -20,9 +22,11 @@ const {
 const getSecondCopyLinkController = async (req, res) => {
     const { id, boleta } = req.params; // Recebe o ID da rota
     try {
+        logger.info("Solicitando 2ª via da fatura", { id, boleta });
         const result = await getSecondCopyLink(id, boleta);
         return res.status(200).json(result);
     } catch (error) {
+        logger.error("Erro ao obter 2ª via da fatura", { error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };
@@ -35,9 +39,11 @@ const getSecondCopyLinkController = async (req, res) => {
 const getLastSixInvoicesController = async (req, res) => {
     const { id } = req.params; // Recebe o ID da rota
     try {
+        logger.info("Buscando últimas 6 faturas", { id });
         const result = await getLastSixInvoices(id);
         return res.status(200).json(result);
     } catch (error) {
+        logger.error("Erro ao obter histórico de faturas", { error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };
@@ -50,9 +56,11 @@ const getLastSixInvoicesController = async (req, res) => {
 const getPixFromLastOpenInternetInvoiceController = async (req, res) => {
     const { id } = req.params; // Recebe o ID da rota
     try {
+        logger.info("Buscando PIX da última fatura em aberto", { id });
         const result = await getPixFromLastOpenInternetInvoice(id);
         return res.status(200).json(result);
     } catch (error) {
+        logger.error("Erro ao obter PIX da fatura", { error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };
@@ -65,9 +73,11 @@ const getPixFromLastOpenInternetInvoiceController = async (req, res) => {
 const checkCurrentInvoiceStatusController = async (req, res) => {
     const { id } = req.params; // Recebe o ID da rota
     try {
+        logger.info("Verificando status da fatura atual", { id });
         const result = await checkCurrentInvoiceStatus(id);
         return res.status(200).json(result);
     } catch (error) {
+        logger.error("Erro ao verificar status da fatura", { error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };
@@ -80,9 +90,11 @@ const checkCurrentInvoiceStatusController = async (req, res) => {
 const getCurrentInvoiceController = async (req, res) => {
     const { id } = req.params; // Recebe o ID da rota
     try {
+        logger.info("Buscando fatura atual", { id });
         const result = await getCurrentInvoice(id);
         return res.status(200).json(result);
     } catch (error) {
+        logger.error("Erro ao buscar fatura atual", { error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };
@@ -96,9 +108,11 @@ const setFaturaDigitalController = async (req, res) => {
     const { id } = req.params; // Recebe o ID da rota
     const data = req.body; 
     try {
+        logger.info("Atualizando fatura digital", { id, data });
         const result = await setFaturaDigital(id, data);
         return res.status(200).json(result);
     } catch (error) {
+        logger.error("Erro ao atualizar fatura digital", { error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };
@@ -112,16 +126,18 @@ const cadastrarLibtempController = async (req, res) => {
     const { codcliente, prazo } = req.body;
     try {
         if (!codcliente || !prazo) {
+            logger.warn("Campos obrigatórios ausentes para liberação temporária", { codcliente, prazo });
             return res.status(400).json({ error: "codcliente e prazo são obrigatórios." });
         }
+        logger.info("Cadastrando liberação temporária", { codcliente, prazo });
         const result = await cadastrarLibtemp(codcliente, prazo);
         return res.status(result.status).json(result);
     } catch (error) {
-        // Dependendo do erro, você pode ajustar o status code
-        // Exemplo: se o status da resposta for 403, retorne 403, caso contrário 500
         if (error.message.includes('não elegível')) {
+            logger.warn("Cliente não elegível para liberação temporária", { error: error.message });
             return res.status(403).json({ error: error.message });
         }
+        logger.error("Erro ao cadastrar liberação temporária", { error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };
@@ -135,12 +151,14 @@ const consultarLibtempPorClienteController = async (req, res) => {
     const { codcliente } = req.params;
     try {
         if (!codcliente) {
+            logger.warn("Codcliente não informado na consulta de liberação temporária");
             return res.status(400).json({ error: "codcliente é obrigatório." });
         }
+        logger.info("Consultando liberação temporária por cliente", { codcliente });
         const result = await consultarLibtempPorCliente(codcliente);
         return res.status(result.status).json(result);
     } catch (error) {
-        // Dependendo do erro, você pode ajustar o status code
+        logger.error("Erro ao consultar liberação temporária", { error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };
@@ -154,11 +172,14 @@ const deletarLibtempController = async (req, res) => {
     const { id } = req.params;
     try {
         if (!id) {
+            logger.warn("ID não informado na deleção da liberação temporária");
             return res.status(400).json({ error: "ID da liberação temporária é obrigatório." });
         }
+        logger.info("Deletando liberação temporária", { id });
         const result = await deletarLibtemp(id);
         return res.status(result.status).json(result);
     } catch (error) {
+        logger.error("Erro ao deletar liberação temporária", { error: error.message });
         return res.status(500).json({ error: error.message });
     }
 };

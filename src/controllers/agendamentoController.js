@@ -1,6 +1,7 @@
 const multer = require("multer");
 const xlsx = require("xlsx");
 const { addRowToSheet } = require("../models/googlesheets");
+const logger = require("../utils/logger"); // ✅ adicionado
 
 // Configuração do Multer para upload de arquivos
 const upload = multer({ dest: "uploads/" });
@@ -18,7 +19,7 @@ const processAgendamento = async (req, res) => {
             const sheetName = workbook.SheetNames[0];
             const sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
 
-            console.log("📊 Dados extraídos do CSV/XLSX:", sheetData);
+            logger.info("📊 Dados extraídos do CSV/XLSX:", { data: sheetData });
 
             let processedRows = 0;
 
@@ -32,11 +33,11 @@ const processAgendamento = async (req, res) => {
                     await addRowToSheet(date, parseInt(appointments));
                     processedRows++;
                 } else {
-                    console.warn(`⚠️ Linha ignorada (inválida): ${JSON.stringify(row)}`);
+                    logger.warn(`⚠️ Linha ignorada (inválida): ${JSON.stringify(row)}`);
                 }
             }
 
-            console.log(`✅ ${processedRows} linhas processadas com sucesso.`);
+            logger.info(`✅ ${processedRows} linhas processadas com sucesso.`);
             res.status(200).json({ message: `📊 ${processedRows} registros adicionados à planilha!` });
         } else {
             // Se for JSON, processa a entrada manual
@@ -50,7 +51,7 @@ const processAgendamento = async (req, res) => {
             res.status(200).json({ message: "📅 Agendamento registrado com sucesso!" });
         }
     } catch (error) {
-        console.error("❌ Erro ao processar agendamento:", error);
+        logger.error("❌ Erro ao processar agendamento:", { error: error.message });
         res.status(500).json({ error: "Erro interno ao processar os agendamentos." });
     }
 };

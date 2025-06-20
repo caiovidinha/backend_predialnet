@@ -1,6 +1,7 @@
 const { client } = require("../prisma/client");
 const axios = require("axios");
 const https = require("https");
+const logger = require("../utils/logger");
 
 const instance = axios.create({
     httpsAgent: new https.Agent({
@@ -21,7 +22,10 @@ const loginAPI = async () => {
         const response = await axios.post('https://uaipi.predialnet.com.br/v1/auth/login', data);
         return response.data.data.access_token;
     } catch (error) {
-        console.error('Erro ao fazer login na API:', error.response ? error.response.data : error.message);
+        logger.error('Erro ao fazer login na API', {
+            error: error.message,
+            response: error.response?.data
+        });
         throw new Error('Não foi possível autenticar com a API externa.');
     }
 };
@@ -73,7 +77,7 @@ const manageShowAd = async (cpf) => {
                     // 4.2.1. Se expirou, atualizar 'show' para true
                     await client.showAd.update({
                         where: { userId: userId },
-                        data: { expiresIn: nextWeek,show: false },
+                        data: { expiresIn: nextWeek, show: false },
                     });
                     return { show: true };
                 }
@@ -92,69 +96,85 @@ const manageShowAd = async (cpf) => {
             }
         }
     } catch (error) {
-        console.error("Erro em manageShowAd:", error);
+        logger.error("Erro em manageShowAd", {
+            cpf,
+            error: error.message
+        });
         throw error;
     }
 };
 
 // Function to update ser_adicional
 const updateSerAdicionalModel = async (id_seradicional, data) => {
-    const token = await loginAPI()
+    const token = await loginAPI();
     const url = `https://uaipi.predialnet.com.br/v1/seradicional/${id_seradicional}`;
   
     try {
-      const response = await instance.put(url, data, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      // Return the response data
-      return response.data;
+        const response = await instance.put(url, data, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+        // Return the response data
+        return response.data;
     } catch (error) {
-      console.error('Error updating ser_adicional:', error.response?.data || error.message);
-      throw error;
+        logger.error('Erro ao atualizar ser_adicional', {
+            id_seradicional,
+            data,
+            error: error.message,
+            response: error.response?.data
+        });
+        throw error;
     }
-  };
+};
 
-  const getUserByIDModel = async (id) => {
-    const token = await loginAPI()
+const getUserByIDModel = async (id) => {
+    const token = await loginAPI();
     const url = `https://uaipi.predialnet.com.br/v1/clientes/${id}`;
   
     try {
-      const response = await instance.get(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      // Return the response data
-      return response.data.data[0];
+        const response = await instance.get(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+        // Return the response data
+        return response.data.data[0];
     } catch (error) {
-      console.error('Error updating ser_adicional:', error.response?.data || error.message);
-      throw error;
+        logger.error('Erro ao buscar usuário por ID', {
+            id,
+            error: error.message,
+            response: error.response?.data
+        });
+        throw error;
     }
-  };
+};
 
-  const updateControleParentalModel = async (id_ponto, data) => {
-    const token = await loginAPI()
+const updateControleParentalModel = async (id_ponto, data) => {
+    const token = await loginAPI();
     const url = `https://uaipi.predialnet.com.br/v1/controleparental/${id_ponto}`;
   
     try {
-      const response = await instance.put(url, data, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      // Retornar os dados da resposta
-      console.log(response.data)
-      return response.data;
+        const response = await instance.put(url, data, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+        // Retornar os dados da resposta
+        return response.data;
     } catch (error) {
-      console.error('Erro no modelo updateControleParentalModel:', error.response?.data || error.message);
-      throw error;
+        logger.error('Erro ao atualizar controle parental', {
+            id_ponto,
+            data,
+            error: error.message,
+            response: error.response?.data
+        });
+        throw error;
     }
-  };
+};
 
 module.exports = {
     manageShowAd,
