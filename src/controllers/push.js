@@ -18,7 +18,11 @@ const saveTokenController = async (req, res) => {
 };
 
 const sendNotificationController = async (req, res) => {
-  const { title, body, data } = req.body;
+  const { title, body, data, authToken } = req.body;
+
+  if (authToken !== process.env.PUSH_AUTH_TOKEN) {
+    return res.status(403).json({ error: "Acesso não autorizado" });
+  }
 
   try {
     const tokens = await getAllTokens();
@@ -31,12 +35,13 @@ const sendNotificationController = async (req, res) => {
     }));
 
     const response = await sendPushNotifications(messages);
-    return res.status(200).json(response);
+    return res.status(200).json({ success: true, count: messages.length, response });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Erro ao enviar notificações" });
   }
 };
+
 
 // webhook: fatura gerada
 const notifyFaturaGerada = async (req, res) => {
@@ -91,9 +96,51 @@ const notifyUsersWithOpenInvoice = async (req, res) => {
   }
 };
 
+const genericWebhookController = async (req, res) => {
+  const { eventType, userId, payload } = req.body;
+
+  try {
+    const token = await getTokenByUserId(userId);
+    if (!token) return res.status(404).json({ error: "Token não encontrado" });
+
+    let title, body;
+
+    switch (eventType) {
+      case "fatura_gerada":
+        title = "📬 Fatura disponível";
+        body = "Sua nova fatura está disponível no app.";
+        break;
+      case "servico_suspenso":
+        title = "🚫 Serviço suspenso";
+        body = "Seu serviço foi suspenso. Regularize sua situação.";
+        break;
+      // outros eventos futuros
+      default:
+        return res.status(400).json({ error: "Evento desconhecido" });
+    }
+
+    const response = await sendPushNotifications([
+      {
+        to: token.token,
+        title,
+        body,
+        sound: "default",
+        data: payload || {},
+      },
+    ]);
+
+    return res.status(200).json({ success: true, response });
+  } catch (err) {
+    console.error("Erro no webhook genérico:", err);
+    return res.status(500).json({ error: "Erro interno" });
+  }
+};
+
+
 module.exports = {
   saveTokenController,
   sendNotificationController,
   notifyFaturaGerada,
   notifyUsersWithOpenInvoice,
+  genericWebhookController
 };
