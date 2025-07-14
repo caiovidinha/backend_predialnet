@@ -372,16 +372,16 @@ resetPassword = async (req, res) => {
         return res.status(400).json({ error: "Erro ao atualizar registros" });
     }
 
-    for (const user of users) {
-        const deletedToken = await client.passwordToken.delete({
-            where: {
-                userId: user.id,
-            },
-        });
-        if (deletedToken) {
-            break;
-        }
-    }
+    // for (const user of users) {
+    //     const deletedToken = await client.passwordToken.delete({
+    //         where: {
+    //             userId: user.id,
+    //         },
+    //     });
+    //     if (deletedToken) {
+    //         break;
+    //     }
+    // }
     
     logger.info("Senha redefinida com sucesso:", { email });
     return res.status(200).json({
