@@ -5,7 +5,7 @@ const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Predialnet - API de Notificações Push",
+      title: "Api Predialnet",
       version: "1.0.0",
       description: "Documentação completa da API Predialnet",
     },
