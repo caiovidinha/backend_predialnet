@@ -174,12 +174,17 @@ login = async (req, res) => {
         }
     
         let clienteAtivo = cliente.users
-    
+        const passwordToken = await client.passwordToken.findFirst({
+            where: { userId: userExists.id },
+        });
+
+        const mustChangePassword = !passwordToken;
         logger.info("Login realizado com sucesso:", { cpf: cliente.cpf });
         return res.status(201).json({
             tokens: await createToken(userExists.id),
             email: userExists.email,
-            clienteAtivo
+            clienteAtivo,
+            mustChangePassword
         });
     } catch (error) {
         logger.error("Erro durante o login:", { error: error.message });
