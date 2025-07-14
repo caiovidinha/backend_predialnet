@@ -9,7 +9,8 @@ const {
     sendEmail,
     censorEmailList,
     getCorrectEmail,
-    updateEmailOnUAIPI 
+    updateEmailOnUAIPI, 
+    validateUserEmail
 } = require("../models/auth");
 const { hash, compare } = require("bcryptjs");
 const logger = require("../utils/logger");
@@ -207,6 +208,20 @@ forgotPassword = async (req, res) => {
         if (!user) {
             logger.warn("Solicitação de senha - usuário não encontrado:", { cpf: userCredential });
             return res.status(403).json({ error: "Usuário não existe" });
+        }
+
+        const checkEmail = await validateUserEmail(userCredential, user.email)
+        if(checkEmail.censoredEmails){
+            logger.warn("E-mail desatualizado na solicitação de senha:", {
+                cpf: userCredential,
+                emailInformado: user.email,
+                emailsDisponiveis: checkEmail.censoredEmails
+            });
+
+            return res.status(400).json({
+                error: "E-mail desatualizado. Atualize seu e-mail na base da Predialnet.",
+                availableEmails: checkEmail.censoredEmails
+            });      
         }
 
         // Gerar token para redefinição de senha
