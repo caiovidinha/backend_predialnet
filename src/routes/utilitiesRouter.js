@@ -138,16 +138,8 @@ utilitiesRouter.post("/controle-parental", utilitiesController.updateControlePar
  *                         type: number
  *                       status_conexao:
  *                         type: string
- *                       sessao_inicio:
- *                         type: string
- *                       plano:
- *                         type: string
  *                       velocidade:
  *                         type: string
- *                       servicos_ativos:
- *                         type: array
- *                         items:
- *                           type: string
  *                 payment_status:
  *                   type: object
  *                   properties:
