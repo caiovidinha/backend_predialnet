@@ -390,6 +390,56 @@ resetPassword = async (req, res) => {
     });
 };
 
+updateUserEmail = async (req, res) => {
+    const { cpf, censoredEmail } = req.body;
+
+    if (!cpf || !censoredEmail) {
+        return res.status(400).json({ error: "CPF e e-mail censurado são obrigatórios." });
+    }
+
+    try {
+        const user = await client.user.findFirst({
+            where: { cpf },
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado." });
+        }
+
+        const emailRecord = await client.emails.findFirst({
+            where: { censoredEmail },
+        });
+
+        if (!emailRecord) {
+            return res.status(404).json({ error: "E-mail não localizado." });
+        }
+
+        const realEmail = emailRecord.email;
+
+        await client.user.update({
+            where: { id: user.id },
+            data: { email: realEmail },
+        });
+
+        logger.info("E-mail atualizado com sucesso", {
+            cpf,
+            novoEmail: realEmail,
+        });
+
+        return res.status(200).json({
+            message: "E-mail atualizado com sucesso.",
+        });
+
+    } catch (error) {
+        logger.error("Erro ao atualizar e-mail", {
+            error: error.message,
+            cpf,
+            censoredEmail,
+        });
+        return res.status(500).json({ error: "Erro interno ao atualizar e-mail." });
+    }
+};
+
 module.exports = {
     getOk,
     newUser,
@@ -399,5 +449,6 @@ module.exports = {
     createUser,
     handleEmail,
     updateEmail,
+    updateUserEmail,
     mustChangePasswordCheck
 };

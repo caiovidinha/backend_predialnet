@@ -240,4 +240,36 @@ loginRouter.post('/emails', constrollerAuth.handleEmail);
 loginRouter.get("/must-change-password/:cpf", constrollerAuth.mustChangePasswordCheck);
 
 
+/**
+ * @swagger
+ * /update-email-censored:
+ *   post:
+ *     summary: Atualiza o e-mail do usuário a partir do CPF e e-mail censurado
+ *     tags: [Usuário]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - cpf
+ *               - censoredEmail
+ *             properties:
+ *               cpf:
+ *                 type: string
+ *               censoredEmail:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: E-mail atualizado com sucesso
+ *       400:
+ *         description: Parâmetros inválidos
+ *       404:
+ *         description: Usuário ou e-mail não encontrado
+ *       500:
+ *         description: Erro interno no servidor
+ */
+loginRouter.post("/update-email-censored", constrollerAuth.updateUserEmail);
+
 module.exports = loginRouter;
