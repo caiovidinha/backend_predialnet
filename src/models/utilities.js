@@ -221,9 +221,21 @@ const getClientStatusModel = async (codcliente) => {
         );
 
         const [payment, libtemp] = await Promise.all([
-            checkCurrentInvoiceStatus(codcliente),
-            consultarLibtempPorCliente(codcliente)
-        ]);
+                checkCurrentInvoiceStatus(codcliente),
+                (async () => {
+                    try {
+                        return await consultarLibtempPorCliente(codcliente);
+                    } catch (err) {
+                        if (
+                            err.message.includes("Nenhuma liberação temporária ativa encontrada para o cliente") ||
+                            err.message.includes("não encontrada")
+                        ) {
+                            return null;
+                        }
+                        throw err; 
+                    }
+                })()
+            ]);
 
         return {
             service_status,
@@ -231,7 +243,7 @@ const getClientStatusModel = async (codcliente) => {
                 status: payment.status,
                 valor: payment.valor || null
             },
-            libtemp_status: !!(libtemp && libtemp.status === 1)
+            libtemp_status: libtemp?.status === 1
         };
     } catch (error) {
         logger.error("Erro em getClientStatusModel", {
