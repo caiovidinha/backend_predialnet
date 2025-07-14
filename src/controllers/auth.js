@@ -194,6 +194,38 @@ login = async (req, res) => {
     
 };
 
+mustChangePasswordCheck = async (req, res) => {
+    try {
+        const { cpf } = req.params;
+
+        if (!cpf) {
+            logger.warn("CPF não fornecido para verificação de troca de senha");
+            return res.status(400).json({ error: "CPF não fornecido" });
+        }
+
+        const user = await client.user.findFirst({
+            where: { cpf }
+        });
+
+        if (!user) {
+            logger.warn("Usuário não encontrado na verificação de troca de senha", { cpf });
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        const token = await client.passwordToken.findFirst({
+            where: { userId: user.id }
+        });
+
+        const mustChangePassword = !token;
+
+        return res.status(200).json({ mustChangePassword });
+    } catch (error) {
+        logger.error("Erro ao verificar necessidade de troca de senha", { error: error.message });
+        return res.status(500).json({ error: "Erro interno ao verificar status de senha" });
+    }
+};
+
+ 
 forgotPassword = async (req, res) => {
     try {
         const { userCredential } = req.body;
@@ -355,5 +387,6 @@ module.exports = {
     resetPassword,
     createUser,
     handleEmail,
-    updateEmail
+    updateEmail,
+    mustChangePasswordCheck
 };

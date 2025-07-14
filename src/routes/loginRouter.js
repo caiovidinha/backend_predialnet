@@ -201,5 +201,37 @@ loginRouter.post("/reset-password", constrollerAuth.resetPassword);
  */
 loginRouter.post('/emails', constrollerAuth.handleEmail);
 
+/**
+ * @swagger
+ * /must-change-password/{cpf}:
+ *   get:
+ *     summary: Verifica se o usuário precisa trocar a senha
+ *     tags: [Senha]
+ *     parameters:
+ *       - in: path
+ *         name: cpf
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: CPF do usuário
+ *     responses:
+ *       200:
+ *         description: Resultado da verificação retornado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 mustChangePassword:
+ *                   type: boolean
+ *       400:
+ *         description: CPF não fornecido
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno no servidor
+ */
+loginRouter.get("/must-change-password/:cpf", constrollerAuth.mustChangePasswordCheck);
+
 
 module.exports = loginRouter;
