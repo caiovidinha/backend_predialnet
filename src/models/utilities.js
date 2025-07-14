@@ -3,6 +3,7 @@ const axios = require("axios");
 const https = require("https");
 const logger = require("../utils/logger");
 const { checkCurrentInvoiceStatus, consultarLibtempPorCliente } = require("../models/fatura");
+const { log } = require("console");
 
 const instance = axios.create({
     httpsAgent: new https.Agent({
@@ -181,7 +182,7 @@ const getClientStatusModel = async (codcliente) => {
     try {
         const token = await loginAPI();
         const clienteData = await getUserByIDModel(codcliente);
-        const serpontos = clienteData.serpontos || [];
+        const serpontos = clienteData.cliente.serpontos || [];
 
         const service_status = await Promise.all(
             serpontos.map(async (ponto) => {
@@ -195,12 +196,7 @@ const getClientStatusModel = async (codcliente) => {
                     return {
                         id_ponto: data.id,
                         status_conexao: data.dados_conexao?.status || "Desconhecido",
-                        sessao_inicio: data.dados_conexao?.sessao_inicio || null,
-                        plano: data.plano?.plano_apelido || null,
-                        velocidade: `${data.plano?.velocidade || ''}${data.plano?.unidade || ''}`,
-                        servicos_ativos: (data.ser_adicionais || [])
-                            .filter(serv => serv.requerido === 1)
-                            .map(serv => serv.nome_servico)
+                        velocidade: `${data.plano?.velocidade || ''} ${data.plano?.unidade || ''}`,
                     };
                 } catch (err) {
                     logger.error("Erro ao consultar serponto", {
