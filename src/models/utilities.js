@@ -2,6 +2,7 @@ const { client } = require("../prisma/client");
 const axios = require("axios");
 const https = require("https");
 const logger = require("../utils/logger");
+const { checkCurrentInvoiceStatus, consultarLibtempPorCliente } = require("../models/fatura");
 
 const instance = axios.create({
     httpsAgent: new https.Agent({
@@ -176,9 +177,75 @@ const updateControleParentalModel = async (id_ponto, data) => {
     }
 };
 
+const getClientStatusModel = async (codcliente) => {
+    try {
+        const token = await loginAPI();
+        const clienteData = await getUserByIDModel(codcliente);
+        const serpontos = clienteData.serpontos || [];
+
+        const service_status = await Promise.all(
+            serpontos.map(async (ponto) => {
+                try {
+                    const response = await instance.get(`https://uaipi.predialnet.com.br/v1/serponto/${ponto.id}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    const data = response.data.data;
+
+                    return {
+                        id_ponto: data.id,
+                        status_conexao: data.dados_conexao?.status || "Desconhecido",
+                        sessao_inicio: data.dados_conexao?.sessao_inicio || null,
+                        plano: data.plano?.plano_apelido || null,
+                        velocidade: `${data.plano?.velocidade || ''}${data.plano?.unidade || ''}`,
+                        servicos_ativos: (data.ser_adicionais || [])
+                            .filter(serv => serv.requerido === 1)
+                            .map(serv => serv.nome_servico)
+                    };
+                } catch (err) {
+                    logger.error("Erro ao consultar serponto", {
+                        id_ponto: ponto.id,
+                        error: err.message
+                    });
+
+                    return {
+                        id_ponto: ponto.id,
+                        status_conexao: "Erro",
+                        sessao_inicio: null,
+                        plano: ponto.plano?.plano_apelido || null,
+                        velocidade: `${ponto.plano?.velocidade || ''}${ponto.plano?.unidade || ''}`,
+                        servicos_ativos: []
+                    };
+                }
+            })
+        );
+
+        const [payment, libtemp] = await Promise.all([
+            checkCurrentInvoiceStatus(codcliente),
+            consultarLibtempPorCliente(codcliente)
+        ]);
+
+        return {
+            service_status,
+            payment_status: {
+                status: payment.status,
+                valor: payment.valor || null
+            },
+            libtemp_status: !!(libtemp && libtemp.status === 1)
+        };
+    } catch (error) {
+        logger.error("Erro em getClientStatusModel", {
+            codcliente,
+            error: error.message
+        });
+        throw error;
+    }
+};
+
 module.exports = {
     manageShowAd,
     updateSerAdicionalModel,
     updateControleParentalModel,
-    getUserByIDModel
+    getUserByIDModel,
+    getClientStatusModel
 };
