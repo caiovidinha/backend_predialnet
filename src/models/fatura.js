@@ -180,7 +180,7 @@ const checkCurrentInvoiceStatus = async (id) => {
             status = 'em aberto';
         }
         
-        return { status: status };
+        return { status: status, valor: currentFatura.valor };
     } catch (error) {
         logger.error('Erro ao verificar status da fatura atual', {
             id,
