@@ -228,7 +228,7 @@ mustChangePasswordCheck = async (req, res) => {
  
 forgotPassword = async (req, res) => {
     try {
-        const { userCredential } = req.body;
+        const { userCredential, insideApp } = req.body;
 
         // Buscar usuário pelo CPF (userCredential)
         const user = await client.user.findFirst({
@@ -262,7 +262,18 @@ forgotPassword = async (req, res) => {
 
         // Criar URL de redefinição de senha
         const urlResetPassword = `https://www.predialnet.com.br/redefinir-senha?token=${passToken}&email=${user.email}`;
+        if (insideApp) {
+            logger.info("Solicitação de redefinição de senha via app. Link gerado diretamente.", {
+                cpf: userCredential,
+                email: user.email,
+                link: urlResetPassword
+            });
 
+            return res.status(200).json({
+                message: "Link de redefinição gerado com sucesso!",
+                url: urlResetPassword,
+            });
+        }
         // Censurar e-mail para o retorno
         const hashEmail = censorEmail(user.email);
 

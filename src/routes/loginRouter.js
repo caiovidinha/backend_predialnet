@@ -142,13 +142,19 @@ loginRouter.post("/refresh-token", controllerRefreshToken.renewToken);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - userCredential
  *             properties:
  *               userCredential:
  *                 type: string
+ *               insideApp:
+ *                 type: boolean
+ *                 description: Define se a requisição foi feita pelo app. Se true, retorna o link diretamente no response.
  *     responses:
  *       200:
- *         description: E-mail enviado com link de redefinição
+ *         description: Link de redefinição enviado por e-mail ou retornado diretamente se insideApp for true
  */
+
 loginRouter.post("/forgot-password", constrollerAuth.forgotPassword);
 
 /**
