@@ -105,7 +105,7 @@ createUser = async(req, res) => {
     `
     <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
         <div style="text-align: center; padding: 20px; background-color: #9c0004; color: white; border-radius: 8px 8px 0 0;">
-            <img src="https://i.ibb.co/py9Qsv9/logo-predialnet-branca.png" alt="Logo Predialnet" style="max-width: 150px; margin-bottom: 10px;">
+            <img src="https://www.predialnet.com.br/download/logo_predialnet_branca.png" alt="Logo Predialnet" style="max-width: 150px; margin-bottom: 10px;">
             <h1 style="margin: 0;">Bem-vindo ao App Minha Predialnet</h1>
         </div>
 
@@ -281,7 +281,7 @@ forgotPassword = async (req, res) => {
         const emailContent = `
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
             <div style="text-align: center; padding: 20px; background-color: #9c0004; color: white; border-radius: 8px 8px 0 0;">
-                <img src="https://i.ibb.co/py9Qsv9/logo-predialnet-branca.png" alt="Logo Predialnet" style="max-width: 150px; margin-bottom: 10px;">
+                <img src="https://www.predialnet.com.br/download/logo_predialnet_branca.png" alt="Logo Predialnet" style="max-width: 150px; margin-bottom: 10px;">
                 <h1 style="margin: 0;">Redefinição de Senha</h1>
             </div>
 
