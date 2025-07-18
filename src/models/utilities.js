@@ -217,27 +217,42 @@ const getClientStatusModel = async (codcliente) => {
         );
 
         const [payment, libtemp] = await Promise.all([
-                checkCurrentInvoiceStatus(codcliente),
-                (async () => {
-                    try {
-                        return await consultarLibtempPorCliente(codcliente);
-                    } catch (err) {
-                        if (
-                            err.message.includes("Nenhuma liberação temporária ativa encontrada para o cliente") ||
-                            err.message.includes("não encontrada")
-                        ) {
-                            return null;
-                        }
-                        throw err; 
+            (async () => {
+                try {
+                    return await checkCurrentInvoiceStatus(codcliente);
+                } catch (err) {
+                    if (
+                        err.message.includes("sem fatura") ||
+                        err.message.includes("não encontrada")
+                    ) {
+                        return {
+                            status: "sem fatura disponível",
+                            valor: "-"
+                        };
                     }
-                })()
-            ]);
+                    throw err;
+                }
+            })(),
+            (async () => {
+                try {
+                    return await consultarLibtempPorCliente(codcliente);
+                } catch (err) {
+                    if (
+                        err.message.includes("Nenhuma liberação temporária ativa encontrada para o cliente") ||
+                        err.message.includes("não encontrada")
+                    ) {
+                        return null;
+                    }
+                    throw err;
+                }
+            })()
+        ]);
 
         return {
             service_status,
             payment_status: {
                 status: payment.status,
-                valor: payment.valor || null
+                valor: payment.valor || "-"
             },
             libtemp_status: libtemp?.status === 1
         };
@@ -249,6 +264,7 @@ const getClientStatusModel = async (codcliente) => {
         throw error;
     }
 };
+
 
 module.exports = {
     manageShowAd,
