@@ -13,6 +13,9 @@ const utilitiesRouter = require("./routes/utilitiesRouter");
 const agendamentoRouter = require("./routes/agendamentoRouter");
 const pushRouter = require("./routes/pushRouter");
 
+const { swaggerUi, specs } = require("./utils/swagger");
+const swaggerAuthMiddleware = require("./middlewares/authSwagger");
+
 const app = express();
 
 app.use(cors());
@@ -26,5 +29,13 @@ app.use("/fatura", faturaRouter);
 app.use("/utils", utilitiesRouter);
 app.use("/agendamento", agendamentoRouter);
 app.use("/push", pushRouter);
+
+// Proteger só a rota principal do Swagger UI
+app.get("/docs", swaggerAuthMiddleware, (req, res, next) => {
+  swaggerUi.setup(specs)(req, res, next);
+});
+
+// Servir os assets normalmente (sem proteção)
+app.use("/docs", swaggerUi.serve);
 
 module.exports = app;

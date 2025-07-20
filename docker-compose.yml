@@ -18,5 +18,24 @@ services:
     ports:
       - "8080:8080"
 
+  mysql-backup:
+    image: debian:latest
+    container_name: mysql-backup
+    depends_on:
+      - mysql
+    volumes:
+      - mysql-data:/var/lib/mysql:ro
+      - ./backups:/backup
+    tty: true
+    stdin_open: true
+    entrypoint: >
+      bash -c "apt-get update && \
+        apt-get install -y cron mariadb-client && \
+        echo \"0 3 * * * root mysqldump -h mysql -uroot -padmin predialnet > /backup/db-\$(date +\%F).sql\" > /etc/cron.d/mysql-backup && \
+        chmod 0644 /etc/cron.d/mysql-backup && \
+        crontab /etc/cron.d/mysql-backup && \
+        cron -f"
+
+
 volumes:
   mysql-data:

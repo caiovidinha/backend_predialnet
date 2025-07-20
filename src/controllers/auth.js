@@ -9,7 +9,8 @@ const {
     sendEmail,
     censorEmailList,
     getCorrectEmail,
-    updateEmailOnUAIPI 
+    updateEmailOnUAIPI, 
+    validateUserEmail
 } = require("../models/auth");
 const { hash, compare } = require("bcryptjs");
 const logger = require("../utils/logger");
@@ -104,7 +105,7 @@ createUser = async(req, res) => {
     `
     <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
         <div style="text-align: center; padding: 20px; background-color: #9c0004; color: white; border-radius: 8px 8px 0 0;">
-            <img src="https://i.ibb.co/py9Qsv9/logo-predialnet-branca.png" alt="Logo Predialnet" style="max-width: 150px; margin-bottom: 10px;">
+            <img src="https://www.predialnet.com.br/download/logo_predialnet_branca.png" alt="Logo Predialnet" style="max-width: 150px; margin-bottom: 10px;">
             <h1 style="margin: 0;">Bem-vindo ao App Minha Predialnet</h1>
         </div>
 
@@ -174,12 +175,17 @@ login = async (req, res) => {
         }
     
         let clienteAtivo = cliente.users
-    
+        const passwordToken = await client.passwordToken.findFirst({
+            where: { userId: userExists.id },
+        });
+
+        const mustChangePassword = !passwordToken;
         logger.info("Login realizado com sucesso:", { cpf: cliente.cpf });
         return res.status(201).json({
             tokens: await createToken(userExists.id),
             email: userExists.email,
-            clienteAtivo
+            clienteAtivo,
+            mustChangePassword
         });
     } catch (error) {
         logger.error("Erro durante o login:", { error: error.message });
@@ -188,9 +194,41 @@ login = async (req, res) => {
     
 };
 
+mustChangePasswordCheck = async (req, res) => {
+    try {
+        const { cpf } = req.params;
+
+        if (!cpf) {
+            logger.warn("CPF não fornecido para verificação de troca de senha");
+            return res.status(400).json({ error: "CPF não fornecido" });
+        }
+
+        const user = await client.user.findFirst({
+            where: { cpf }
+        });
+
+        if (!user) {
+            logger.warn("Usuário não encontrado na verificação de troca de senha", { cpf });
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        const token = await client.passwordToken.findFirst({
+            where: { userId: user.id }
+        });
+
+        const mustChangePassword = !token;
+
+        return res.status(200).json({ mustChangePassword });
+    } catch (error) {
+        logger.error("Erro ao verificar necessidade de troca de senha", { error: error.message });
+        return res.status(500).json({ error: "Erro interno ao verificar status de senha" });
+    }
+};
+
+ 
 forgotPassword = async (req, res) => {
     try {
-        const { userCredential } = req.body;
+        const { userCredential, insideApp } = req.body;
 
         // Buscar usuário pelo CPF (userCredential)
         const user = await client.user.findFirst({
@@ -204,13 +242,38 @@ forgotPassword = async (req, res) => {
             return res.status(403).json({ error: "Usuário não existe" });
         }
 
+        const checkEmail = await validateUserEmail(userCredential, user.email)
+        if(checkEmail.censoredEmails){
+            logger.warn("E-mail desatualizado na solicitação de senha:", {
+                cpf: userCredential,
+                emailInformado: user.email,
+                emailsDisponiveis: checkEmail.censoredEmails
+            });
+
+            return res.status(400).json({
+                error: "E-mail desatualizado. Atualize seu e-mail na base da Predialnet.",
+                availableEmails: checkEmail.censoredEmails
+            });      
+        }
+
         // Gerar token para redefinição de senha
         const token = await generatePasswordToken(user.id);
         const passToken = token.id;
 
         // Criar URL de redefinição de senha
         const urlResetPassword = `https://www.predialnet.com.br/redefinir-senha?token=${passToken}&email=${user.email}`;
+        if (insideApp) {
+            logger.info("Solicitação de redefinição de senha via app. Link gerado diretamente.", {
+                cpf: userCredential,
+                email: user.email,
+                link: urlResetPassword
+            });
 
+            return res.status(200).json({
+                message: "Link de redefinição gerado com sucesso!",
+                url: urlResetPassword,
+            });
+        }
         // Censurar e-mail para o retorno
         const hashEmail = censorEmail(user.email);
 
@@ -218,7 +281,7 @@ forgotPassword = async (req, res) => {
         const emailContent = `
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
             <div style="text-align: center; padding: 20px; background-color: #9c0004; color: white; border-radius: 8px 8px 0 0;">
-                <img src="https://i.ibb.co/py9Qsv9/logo-predialnet-branca.png" alt="Logo Predialnet" style="max-width: 150px; margin-bottom: 10px;">
+                <img src="https://www.predialnet.com.br/download/logo_predialnet_branca.png" alt="Logo Predialnet" style="max-width: 150px; margin-bottom: 10px;">
                 <h1 style="margin: 0;">Redefinição de Senha</h1>
             </div>
 
@@ -309,22 +372,72 @@ resetPassword = async (req, res) => {
         return res.status(400).json({ error: "Erro ao atualizar registros" });
     }
 
-    for (const user of users) {
-        const deletedToken = await client.passwordToken.delete({
-            where: {
-                userId: user.id,
-            },
-        });
-        if (deletedToken) {
-            break;
-        }
-    }
+    // for (const user of users) {
+    //     const deletedToken = await client.passwordToken.delete({
+    //         where: {
+    //             userId: user.id,
+    //         },
+    //     });
+    //     if (deletedToken) {
+    //         break;
+    //     }
+    // }
     
     logger.info("Senha redefinida com sucesso:", { email });
     return res.status(200).json({
         status: "Sucesso",
         mensagem: "Senha alterada com sucesso!",
     });
+};
+
+updateUserEmail = async (req, res) => {
+    const { cpf, censoredEmail } = req.body;
+
+    if (!cpf || !censoredEmail) {
+        return res.status(400).json({ error: "CPF e e-mail censurado são obrigatórios." });
+    }
+
+    try {
+        const user = await client.user.findFirst({
+            where: { cpf },
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado." });
+        }
+
+        const emailRecord = await client.emails.findFirst({
+            where: { censoredEmail },
+        });
+
+        if (!emailRecord) {
+            return res.status(404).json({ error: "E-mail não localizado." });
+        }
+
+        const realEmail = emailRecord.email;
+
+        await client.user.update({
+            where: { id: user.id },
+            data: { email: realEmail },
+        });
+
+        logger.info("E-mail atualizado com sucesso", {
+            cpf,
+            novoEmail: realEmail,
+        });
+
+        return res.status(200).json({
+            message: "E-mail atualizado com sucesso.",
+        });
+
+    } catch (error) {
+        logger.error("Erro ao atualizar e-mail", {
+            error: error.message,
+            cpf,
+            censoredEmail,
+        });
+        return res.status(500).json({ error: "Erro interno ao atualizar e-mail." });
+    }
 };
 
 module.exports = {
@@ -335,5 +448,7 @@ module.exports = {
     resetPassword,
     createUser,
     handleEmail,
-    updateEmail
+    updateEmail,
+    updateUserEmail,
+    mustChangePasswordCheck
 };

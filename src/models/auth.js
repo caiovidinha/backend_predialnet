@@ -324,6 +324,26 @@ const getCorrectEmail = async (censoredEmail) => {
     return correctEmail.email;
 };
 
+const validateUserEmail = async (cpf, providedEmail) => {
+    const users = await getUsers(cpf);
+
+    const clientEmails = users.users.map(user => user.cliente.email).filter(email => !!email);
+
+    const censoredEmailsSet = await censorEmailList(clientEmails);
+    const censoredEmails = Array.from(censoredEmailsSet);
+
+    const emailExists = clientEmails.includes(providedEmail);
+
+    if (!emailExists) {
+        logger.warn("E-mail informado não corresponde aos e-mails cadastrados:", { cpf, providedEmail });
+        return {
+            censoredEmails
+        };
+    }
+
+    return false;
+};
+
 const censorEmailList = async (emailLists) => {
     let censoredEmails = new Set();
     const unicos = new Set(emailLists);
@@ -380,5 +400,6 @@ module.exports = {
     sendEmail,
     censorEmailList,
     getCorrectEmail,
-    updateEmailOnUAIPI
+    updateEmailOnUAIPI,
+    validateUserEmail
 };

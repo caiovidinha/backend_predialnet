@@ -2,6 +2,8 @@ const { client } = require("../prisma/client");
 const axios = require("axios");
 const https = require("https");
 const logger = require("../utils/logger");
+const { checkCurrentInvoiceStatus, consultarLibtempPorCliente } = require("../models/fatura");
+const { log } = require("console");
 
 const instance = axios.create({
     httpsAgent: new https.Agent({
@@ -176,9 +178,98 @@ const updateControleParentalModel = async (id_ponto, data) => {
     }
 };
 
+const getClientStatusModel = async (codcliente) => {
+    try {
+        const token = await loginAPI();
+        const clienteData = await getUserByIDModel(codcliente);
+        const serpontos = clienteData.cliente.serpontos || [];
+
+        const service_status = await Promise.all(
+            serpontos.map(async (ponto) => {
+                try {
+                    const response = await instance.get(`https://uaipi.predialnet.com.br/v1/serponto/${ponto.id}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    const data = response.data.data;
+
+                    return {
+                        id_ponto: data.id,
+                        status_conexao: data.dados_conexao?.status || "Desconhecido",
+                        velocidade: `${data.plano?.velocidade || ''} ${data.plano?.unidade || ''}`,
+                    };
+                } catch (err) {
+                    logger.error("Erro ao consultar serponto", {
+                        id_ponto: ponto.id,
+                        error: err.message
+                    });
+
+                    return {
+                        id_ponto: ponto.id,
+                        status_conexao: "Erro",
+                        sessao_inicio: null,
+                        plano: ponto.plano?.plano_apelido || null,
+                        velocidade: `${ponto.plano?.velocidade || ''}${ponto.plano?.unidade || ''}`,
+                        servicos_ativos: []
+                    };
+                }
+            })
+        );
+
+        const [payment, libtemp] = await Promise.all([
+            (async () => {
+                try {
+                    return await checkCurrentInvoiceStatus(codcliente);
+                } catch (err) {
+                    if (
+                        err.message.includes("sem fatura") ||
+                        err.message.includes("não encontrada")
+                    ) {
+                        return {
+                            status: "sem fatura disponível",
+                            valor: "-"
+                        };
+                    }
+                    throw err;
+                }
+            })(),
+            (async () => {
+                try {
+                    return await consultarLibtempPorCliente(codcliente);
+                } catch (err) {
+                    if (
+                        err.message.includes("Nenhuma liberação temporária ativa encontrada para o cliente") ||
+                        err.message.includes("não encontrada")
+                    ) {
+                        return null;
+                    }
+                    throw err;
+                }
+            })()
+        ]);
+
+        return {
+            service_status,
+            payment_status: {
+                status: payment.status,
+                valor: payment.valor || "-"
+            },
+            libtemp_status: libtemp?.status === 1
+        };
+    } catch (error) {
+        logger.error("Erro em getClientStatusModel", {
+            codcliente,
+            error: error.message
+        });
+        throw error;
+    }
+};
+
+
 module.exports = {
     manageShowAd,
     updateSerAdicionalModel,
     updateControleParentalModel,
-    getUserByIDModel
+    getUserByIDModel,
+    getClientStatusModel
 };
