@@ -111,8 +111,8 @@ async function notifyFaturaGerada(req, res) {
       }
       messages.push({
         to: token,
-        title: "📬 Fatura disponível",
-        body: "Sua nova fatura está disponível no app.",
+        title: "Fatura disponível",
+        body: "Sua fatura já está disponível no app para pagamento.",
         sound: "default",
         data: { url: "predialnet://fatura" }
       });
@@ -126,8 +126,8 @@ async function notifyFaturaGerada(req, res) {
     // 5) Criar registro e enfileirar
     const note = await prisma.notification.create({
       data: {
-        title: "📬 Fatura disponível",
-        body: "Sua nova fatura está disponível no app.",
+        title: "Fatura disponível",
+        body: "Sua fatura já está disponível no app para pagamento.",
         data: { url: "predialnet://fatura" },
         status: "pending"
       }
@@ -185,7 +185,7 @@ async function notifyFaturaVencida(req, res) {
       }
       messages.push({
         to: token,
-        title: "💸 Fatura vencida",
+        title: "Fatura vencida",
         body: "Sua fatura está vencida. Pague agora para evitar bloqueios!",
         sound: "default",
         data: { url: "predialnet://fatura" }
@@ -198,7 +198,7 @@ async function notifyFaturaVencida(req, res) {
 
     const note = await prisma.notification.create({
       data: {
-        title: "💸 Fatura vencida",
+        title: "Fatura vencida",
         body: "Sua fatura está vencida. Pague agora para evitar bloqueios!",
         data: { url: "predialnet://fatura" },
         status: "pending"
