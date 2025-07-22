@@ -14,15 +14,16 @@ model User {
   password       String
   refresh_token  RefreshToken?
   password_token PasswordToken?
-  show_ad        ShowAd?        
+  show_ad        ShowAd?
+  pushTokens     PushToken[]
 
   @@map("users")
 }
 
 model Emails {
   id            String @id @default(uuid())
-  censoredEmail String 
-  email         String 
+  censoredEmail String
+  email         String
 
   @@map("emails")
 }
@@ -63,5 +64,31 @@ model PushToken {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([userId])
+  @@index([createdAt])
   @@map("push_tokens")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  body      String?
+  data      Json?
+  status    String   @default("pending") // pending | sent | failed
+  tokens    Int      @default(0) // quantos tentamos
+  receipts  Json? // array de tickets do Expo
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model UserMetadata {
+  userId      String   @id
+  hasOpenBill Boolean  @default(false)
+  address     String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("user_metadata")
 }
