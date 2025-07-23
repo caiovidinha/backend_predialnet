@@ -230,32 +230,58 @@ async function sendFilteredNotificationsController(req, res) {
   if (authToken !== process.env.PUSH_AUTH_TOKEN) {
     return res.status(403).json({ error: "Acesso não autorizado" });
   }
+
   if (!title || !body || typeof filters !== "object") {
     return res.status(400).json({ error: "Payload inválido" });
   }
 
   try {
-    // 1) Busca na tabela user_metadata
-    const whereMeta = {};
-    if (filters.hasOpenBill !== undefined) {
-      whereMeta.hasOpenBill = filters.hasOpenBill;
-    }
-    if (filters.addressContains) {
-      whereMeta.address = { contains: filters.addressContains };
+    let userIdsFromCpfs = null;
+    let userIdsFromMeta = null;
+
+    // 1) Filtra por CPF se informado
+    if (Array.isArray(filters.cpfs) && filters.cpfs.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { cpf: { in: filters.cpfs } },
+        select: { id: true }
+      });
+      userIdsFromCpfs = users.map((u) => u.id);
     }
 
-    const metaRecords = await prisma.userMetadata.findMany({
-      where: whereMeta,
-      select: { userId: true }
-    });
-    const userIds = metaRecords.map(m => m.userId);
+    // 2) Filtra por metadata se informado
+    const hasOtherFilters = filters.hasOpenBill !== undefined || filters.addressContains;
+    if (hasOtherFilters) {
+      const whereMeta = {};
+      if (filters.hasOpenBill !== undefined) {
+        whereMeta.hasOpenBill = filters.hasOpenBill;
+      }
+      if (filters.addressContains) {
+        whereMeta.address = { contains: filters.addressContains };
+      }
 
-    if (userIds.length === 0) {
+      const metaRecords = await prisma.userMetadata.findMany({
+        where: whereMeta,
+        select: { userId: true }
+      });
+      userIdsFromMeta = metaRecords.map((m) => m.userId);
+    }
+
+    // 3) Combina os filtros
+    let finalUserIds = null;
+    if (userIdsFromCpfs && userIdsFromMeta) {
+      // Interseção se ambos os filtros forem usados
+      const set = new Set(userIdsFromCpfs);
+      finalUserIds = userIdsFromMeta.filter((id) => set.has(id));
+    } else {
+      finalUserIds = userIdsFromCpfs || userIdsFromMeta;
+    }
+
+    if (!finalUserIds || finalUserIds.length === 0) {
       return res.status(200).json({ success: true, queued: 0 });
     }
 
-    // 2) Carrega tokens desses usuários
-    const tokens = await getTokensByUserIds(userIds);
+    // 4) Busca tokens
+    const tokens = await getTokensByUserIds(finalUserIds);
     const messages = tokens.map(({ token }) => ({
       to: token,
       title,
@@ -268,12 +294,12 @@ async function sendFilteredNotificationsController(req, res) {
       return res.status(200).json({ success: true, queued: 0 });
     }
 
-    // 3) Cria registro de notification
+    // 5) Cria notificação
     const note = await prisma.notification.create({
       data: { title, body, data, status: "pending" }
     });
 
-    // 4) Enfileira no worker
+    // 6) Enfileira
     await pushQueue.add(
       { messages, notificationId: note.id },
       { attempts: 3, backoff: 5000 }
@@ -289,6 +315,8 @@ async function sendFilteredNotificationsController(req, res) {
     return res.status(500).json({ error: "Erro interno" });
   }
 }
+
+
 
 
 module.exports = {
