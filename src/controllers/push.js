@@ -247,6 +247,7 @@ async function sendFilteredNotificationsController(req, res) {
       });
       userIdsFromCpfs = users.map((u) => u.id);
     }
+    logger.info(`Usuários filtrados por CPF: ${userIdsFromCpfs ? userIdsFromCpfs.length : 0}`);
 
     // 2) Filtra por metadata se informado
     const hasOtherFilters = filters.hasOpenBill !== undefined || filters.addressContains;
@@ -282,6 +283,7 @@ async function sendFilteredNotificationsController(req, res) {
 
     // 4) Busca tokens
     const tokens = await getTokensByUserIds(finalUserIds);
+    logger.info(`Tokens encontrados: ${tokens.length}`);
     const messages = tokens.map(({ token }) => ({
       to: token,
       title,
