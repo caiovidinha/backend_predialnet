@@ -247,7 +247,7 @@ async function sendFilteredNotificationsController(req, res) {
       });
       userIdsFromCpfs = users.map((u) => u.id);
     }
-    logger.info(`Usuários filtrados por CPF: ${userIdsFromCpfs ? userIdsFromCpfs.length : 0}`);
+    logger.info(`Usuários filtrados por CPF: ${userIdsFromCpfs ? userIdsFromCpfs : 0}`);
 
     // 2) Filtra por metadata se informado
     const hasOtherFilters = filters.hasOpenBill !== undefined || filters.addressContains;
@@ -269,12 +269,19 @@ async function sendFilteredNotificationsController(req, res) {
 
     // 3) Combina os filtros
     let finalUserIds = null;
-    if (userIdsFromCpfs && userIdsFromMeta) {
-      // Interseção se ambos os filtros forem usados
+    
+    // Se só tiver filtro de CPF, usa direto a lista de IDs dos CPFs
+    if (userIdsFromCpfs && !hasOtherFilters) {
+      finalUserIds = userIdsFromCpfs;
+    } 
+    // Se tiver ambos os filtros, faz a interseção
+    else if (userIdsFromCpfs && userIdsFromMeta) {
       const set = new Set(userIdsFromCpfs);
       finalUserIds = userIdsFromMeta.filter((id) => set.has(id));
-    } else {
-      finalUserIds = userIdsFromCpfs || userIdsFromMeta;
+    } 
+    // Se só tiver filtro de metadata, usa a lista de IDs da metadata
+    else {
+      finalUserIds = userIdsFromMeta;
     }
 
     if (!finalUserIds || finalUserIds.length === 0) {
