@@ -12,7 +12,7 @@ const router = express.Router();
  * @swagger
  * /trello/clientes:
  *   post:
- *     summary: Cria um card de cliente no Trello
+ *     summary: Cria um card de cliente com dados básicos no Trello
  *     tags: [Trello]
  *     requestBody:
  *       required: true
@@ -30,15 +30,21 @@ const router = express.Router();
  *               nome:
  *                 type: string
  *                 description: Nome completo do cliente
+ *               whatsapp:
+ *                 type: string
+ *                 description: DDD + WhatsApp
+ *               telefone:
+ *                 type: string
+ *                 description: Telefone para contato
+ *               email:
+ *                 type: string
+ *                 description: Email do cliente
  *               planoAtual:
  *                 type: string
  *                 description: Descrição do plano atual
  *               planoAlvo:
  *                 type: string
  *                 description: Descrição do plano alvo
- *               whatsapp:
- *                 type: string
- *                 description: DDD + WhatsApp (opcional)
  *             required:
  *               - listId
  *               - codcliente
@@ -46,23 +52,11 @@ const router = express.Router();
  *               - planoAtual
  *               - planoAlvo
  *     responses:
- *       '200':
+ *       200:
  *         description: Card criado com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Card criado com sucesso no Trello
- *                 cardId:
- *                   type: string
- *                 cardUrl:
- *                   type: string
- *       '400':
+ *       400:
  *         description: Dados inválidos
- *       '500':
+ *       500:
  *         description: Erro interno
  */
 router.post("/clientes", sendClientToTrello);

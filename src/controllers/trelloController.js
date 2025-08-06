@@ -3,52 +3,48 @@ const logger = require("../utils/logger");
 
 /**
  * POST /trello/clientes
- * Cria um card de cliente no Trello com:
- * - Código do cliente
- * - Nome
- * - (Opcional) DDD + WhatsApp
- * - Plano atual
- * - Plano alvo
+ * Cria um card de cliente no Trello com os campos:
+ *   Código Cliente, Nome, DDD + WhatsApp, Telefone para contato, Email, Plano atual, Plano alvo
  *
  * Body JSON:
- *   listId      – ID da lista Trello (required)
- *   codcliente  – código do cliente        (required)
- *   nome        – nome completo            (required)
- *   planoAtual  – descrição do plano atual  (required)
- *   planoAlvo   – descrição do plano alvo   (required)
- *   whatsapp    – DDD + WhatsApp            (optional)
+ *   listId         – ID da lista Trello               (required)
+ *   codcliente     – código interno do cliente        (required)
+ *   nome           – nome completo do cliente         (required)
+ *   whatsapp       – DDD + WhatsApp                   (optional)
+ *   telefone       – Telefone para contato            (optional)
+ *   email          – email do cliente                 (optional)
+ *   planoAtual     – descrição do plano atual          (required)
+ *   planoAlvo      – descrição do plano alvo           (required)
  */
 async function sendClientToTrello(req, res) {
   const {
     listId,
     codcliente,
     nome,
+    whatsapp,
+    telefone,
+    email,
     planoAtual,
-    planoAlvo,
-    whatsapp
+    planoAlvo
   } = req.body;
 
   // validação mínima
-  if (!listId || !codcliente || !nome || !planoAtual || !planoAlvo) {
+  if (!listId || !codcliente || !nome || !whatsapp || !telefone || !email || !planoAtual || !planoAlvo) {
     return res.status(400).json({
-      error: "Campos obrigatórios: listId, codcliente, nome, planoAtual, planoAlvo"
+      error: "Campos obrigatórios: listId, codcliente, nome, whatsapp, telefone, email, planoAtual, planoAlvo"
     });
   }
 
   // monta a descrição do card
-  const descLines = [
+  const desc = [
     `Código Cliente: ${codcliente}`,
-    `Nome: ${nome}`
-  ];
-  if (whatsapp) {
-    descLines.push(`DDD + WhatsApp: ${whatsapp}`);
-  }
-  descLines.push(
+    `Nome: ${nome}`,
+    `DDD + WhatsApp: ${whatsapp}`,
+    `Telefone para contato: ${telefone}`,
+    `Email: ${email}`,
     `Plano atual: ${planoAtual}`,
     `Plano alvo: ${planoAlvo}`
-  );
-
-  const desc = descLines.join("\n");
+  ].join("\n");
 
   try {
     const card = await createCard(listId, `Cliente ${codcliente} – ${nome}`, desc);
