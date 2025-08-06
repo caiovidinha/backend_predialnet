@@ -12,6 +12,7 @@ const faturaRouter = require("./routes/faturaRouter");
 const utilitiesRouter = require("./routes/utilitiesRouter");
 const agendamentoRouter = require("./routes/agendamentoRouter");
 const pushRouter = require("./routes/pushRouter");
+const trelloRouter = require("./routes/trelloRouter");
 
 const { swaggerUi, specs } = require("./utils/swagger");
 const swaggerAuthMiddleware = require("./middlewares/authSwagger");
@@ -29,6 +30,7 @@ app.use("/fatura", faturaRouter);
 app.use("/utils", utilitiesRouter);
 app.use("/agendamento", agendamentoRouter);
 app.use("/push", pushRouter);
+app.use("/trello", trelloRouter);
 
 // Proteger só a rota principal do Swagger UI
 app.get("/docs", swaggerAuthMiddleware, (req, res, next) => {
