@@ -30,9 +30,6 @@ const router = express.Router();
  *               nome:
  *                 type: string
  *                 description: Nome completo do cliente
- *               whatsapp:
- *                 type: string
- *                 description: DDD + WhatsApp
  *               telefone:
  *                 type: string
  *                 description: Telefone para contato

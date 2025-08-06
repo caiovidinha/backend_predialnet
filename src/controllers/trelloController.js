@@ -10,7 +10,6 @@ const logger = require("../utils/logger");
  *   listId         – ID da lista Trello               (required)
  *   codcliente     – código interno do cliente        (required)
  *   nome           – nome completo do cliente         (required)
- *   whatsapp       – DDD + WhatsApp                   (optional)
  *   telefone       – Telefone para contato            (optional)
  *   email          – email do cliente                 (optional)
  *   planoAtual     – descrição do plano atual          (required)
@@ -21,7 +20,6 @@ async function sendClientToTrello(req, res) {
     listId,
     codcliente,
     nome,
-    whatsapp,
     telefone,
     email,
     planoAtual,
@@ -29,7 +27,7 @@ async function sendClientToTrello(req, res) {
   } = req.body;
 
   // validação mínima
-  if (!listId || !codcliente || !nome || !whatsapp || !telefone || !email || !planoAtual || !planoAlvo) {
+  if (!listId || !codcliente || !nome || !planoAtual || !planoAlvo) {
     return res.status(400).json({
       error: "Campos obrigatórios: listId, codcliente, nome, whatsapp, telefone, email, planoAtual, planoAlvo"
     });
@@ -39,7 +37,6 @@ async function sendClientToTrello(req, res) {
   const desc = [
     `Código Cliente: ${codcliente}`,
     `Nome: ${nome}`,
-    `DDD + WhatsApp: ${whatsapp}`,
     `Telefone para contato: ${telefone}`,
     `Email: ${email}`,
     `Plano atual: ${planoAtual}`,
