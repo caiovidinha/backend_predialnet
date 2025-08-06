@@ -11,8 +11,7 @@ const router = express.Router();
 const {
   saveTokenController,
   sendNotificationController,
-  notifyFaturaGerada,
-  notifyFaturaVencida,
+  webhookController,
   sendFilteredNotificationsController
 } = require("../controllers/push");
 
