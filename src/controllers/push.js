@@ -1,6 +1,6 @@
 // controllers/push.js
 
-const { savePushToken, getAllTokens, getTokenByUserId, getTokensByUserIds } = require("../models/push");
+const { savePushToken, getAllTokens, getTokensByUserIds } = require("../models/push");
 const pushQueue = require("../queues/pushQueue");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
@@ -74,85 +74,27 @@ const sendNotificationController = async (req, res) => {
 
 
 
-async function notifyFaturaGerada(req, res) {
-  const { cpfs } = req.body;
-  if (!Array.isArray(cpfs) || cpfs.length === 0) {
-    return res.status(400).json({ error: "Lista de CPFs não fornecida" });
+async function webhookController(req, res) {
+  const { eventType, cpfs } = req.body;
+  if (!eventType || !Array.isArray(cpfs) || cpfs.length === 0) {
+    return res.status(400).json({ error: "eventType ou lista de CPFs não fornecida" });
   }
 
-  try {
-    // 1) Buscar em lote os usuários que existem
-    const users = await prisma.user.findMany({
-      where: { cpf: { in: cpfs } },
-      select: { id: true, cpf: true }
-    });
-    const foundCpfs = users.map(u => u.cpf);
-    const missing = cpfs.filter(c => !foundCpfs.includes(c));
-    if (missing.length) {
-      logger.warn(`Usuários não encontrados para CPFs: ${missing.join(", ")}`);
-    }
-
-    if (users.length === 0) {
-      return res.status(200).json({ success: true, queued: 0 });
-    }
-
-    // 2) Buscar em lote tokens dos usuários válidos
-    const userIds = users.map(u => u.id);
-    const tokens = await getTokensByUserIds(userIds);
-    const tokenMap = new Map(tokens.map(t => [t.userId, t.token]));
-
-    // 3) Montar mensagens somente para quem tem token
-    const messages = [];
-    for (const { id: userId, cpf } of users) {
-      const token = tokenMap.get(userId);
-      if (!token) {
-        logger.warn(`Token não encontrado para CPF ${cpf} (usuário ${userId})`);
-        continue;
-      }
-      messages.push({
-        to: token,
-        title: "Fatura disponível",
-        body: "Sua fatura já está disponível no app para pagamento.",
-        sound: "default",
-        data: { url: "predialnet://fatura" }
-      });
-    }
-
-    // 4) Se não houver mensagens, encerra
-    if (messages.length === 0) {
-      return res.status(200).json({ success: true, queued: 0 });
-    }
-
-    // 5) Criar registro e enfileirar
-    const note = await prisma.notification.create({
-      data: {
-        title: "Fatura disponível",
-        body: "Sua fatura já está disponível no app para pagamento.",
-        data: { url: "predialnet://fatura" },
-        status: "pending"
-      }
-    });
-
-    await pushQueue.add(
-      { messages, notificationId: note.id },
-      { attempts: 3, backoff: 5000 }
-    );
-
-    return res.status(202).json({
-      success: true,
-      queued: messages.length,
-      notificationId: note.id
-    });
-  } catch (err) {
-    logger.error("Erro ao enfileirar push de fatura gerada:", err);
-    return res.status(500).json({ error: "Erro interno" });
-  }
-}
-
-async function notifyFaturaVencida(req, res) {
-  const { cpfs } = req.body;
-  if (!Array.isArray(cpfs) || cpfs.length === 0) {
-    return res.status(400).json({ error: "Lista de CPFs não fornecida" });
+  // Define conteúdo da notificação
+  let title, message, urlPath;
+  switch (eventType) {
+    case "fatura-gerada":
+      title = "Fatura disponível";
+      message = "Sua fatura já está disponível no app para pagamento.";
+      urlPath = "predialnet://fatura";
+      break;
+    case "fatura-vencida":
+      title = "Fatura vencida";
+      message = "Sua fatura está vencida. Pague agora para evitar bloqueios!";
+      urlPath = "predialnet://fatura";
+      break;
+    default:
+      return res.status(400).json({ error: `eventType inválido: ${eventType}` });
   }
 
   try {
@@ -170,41 +112,44 @@ async function notifyFaturaVencida(req, res) {
       return res.status(200).json({ success: true, queued: 0 });
     }
 
-    // 2) Buscar tokens
+    // 2) Buscar tokens dos usuários válidos
     const userIds = users.map(u => u.id);
     const tokens = await getTokensByUserIds(userIds);
     const tokenMap = new Map(tokens.map(t => [t.userId, t.token]));
 
     // 3) Montar mensagens
-    const messages = [];
-    for (const { id: userId, cpf } of users) {
-      const token = tokenMap.get(userId);
-      if (!token) {
-        logger.warn(`Token não encontrado para CPF ${cpf} (usuário ${userId})`);
-        continue;
-      }
-      messages.push({
-        to: token,
-        title: "Fatura vencida",
-        body: "Sua fatura está vencida. Pague agora para evitar bloqueios!",
-        sound: "default",
-        data: { url: "predialnet://fatura" }
-      });
-    }
+    const messages = users
+      .map(({ id: userId, cpf }) => {
+        const token = tokenMap.get(userId);
+        if (!token) {
+          logger.warn(`Token não encontrado para CPF ${cpf} (usuário ${userId})`);
+          return null;
+        }
+        return {
+          to: token,
+          title,
+          body: message,
+          sound: "default",
+          data: { url: urlPath }
+        };
+      })
+      .filter(Boolean);
 
     if (messages.length === 0) {
       return res.status(200).json({ success: true, queued: 0 });
     }
 
+    // 4) Criar registro de notificação
     const note = await prisma.notification.create({
       data: {
-        title: "Fatura vencida",
-        body: "Sua fatura está vencida. Pague agora para evitar bloqueios!",
-        data: { url: "predialnet://fatura" },
+        title,
+        body: message,
+        data: { url: urlPath },
         status: "pending"
       }
     });
 
+    // 5) Enfileirar no worker
     await pushQueue.add(
       { messages, notificationId: note.id },
       { attempts: 3, backoff: 5000 }
@@ -216,7 +161,7 @@ async function notifyFaturaVencida(req, res) {
       notificationId: note.id
     });
   } catch (err) {
-    logger.error("Erro ao enfileirar push de fatura vencida:", err);
+    logger.error(`Erro ao processar webhook ${eventType}:`, err);
     return res.status(500).json({ error: "Erro interno" });
   }
 }
@@ -331,7 +276,6 @@ async function sendFilteredNotificationsController(req, res) {
 module.exports = {
   saveTokenController,
   sendNotificationController,
-  notifyFaturaGerada,
-  notifyFaturaVencida,
+  webhookController,
   sendFilteredNotificationsController
 };

@@ -239,9 +239,9 @@ router.post("/send", sendNotificationController);
 
 /**
  * @swagger
- * /push/webhook/fatura-gerada:
+ * /push/webhook:
  *   post:
- *     summary: Envia notificação de fatura disponível para uma lista de CPFs
+ *     summary: Envia notificação de fatura (gerada ou vencida) baseado em eventType
  *     tags: [Push]
  *     requestBody:
  *       required: true
@@ -250,111 +250,26 @@ router.post("/send", sendNotificationController);
  *           schema:
  *             type: object
  *             properties:
+ *               eventType:
+ *                 type: string
+ *                 enum: [fatura-gerada, fatura-vencida]
+ *                 description: Tipo de evento para notificação
  *               cpfs:
  *                 type: array
  *                 items:
  *                   type: string
  *                 description: Lista de CPFs dos usuários a notificar
  *             required:
+ *               - eventType
  *               - cpfs
  *     responses:
  *       202:
  *         description: Notificações enfileiradas com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 queued:
- *                   type: integer
- *                   description: Número de notificações enfileiradas
- *                 notificationId:
- *                   type: string
- *                   description: ID da notificação criada
  *       400:
- *         description: Lista de CPFs não fornecida
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Lista de CPFs não fornecida
+ *         description: Payload inválido
  *       500:
- *         description: Erro interno ao enfileirar notificações
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Erro interno
+ *         description: Erro interno
  */
-router.post("/webhook/fatura-gerada", notifyFaturaGerada);
-
-/**
- * @swagger
- * /push/webhook/fatura-vencida:
- *   post:
- *     summary: Envia notificações de fatura vencida para uma lista de CPFs
- *     tags: [Push]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               cpfs:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Lista de CPFs dos usuários a notificar
- *             required:
- *               - cpfs
- *     responses:
- *       202:
- *         description: Notificações enfileiradas com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 queued:
- *                   type: integer
- *                   description: Número de notificações enfileiradas
- *                 notificationId:
- *                   type: string
- *                   description: ID da notificação criada
- *       400:
- *         description: Lista de CPFs não fornecida
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Lista de CPFs não fornecida
- *       500:
- *         description: Erro interno ao enfileirar notificações
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Erro interno
- */
-router.post("/webhook/fatura-vencida", notifyFaturaVencida);
+router.post("/webhook", webhookController);
 
 module.exports = router;
