@@ -258,6 +258,9 @@ router.post("/send", sendNotificationController);
  *                 items:
  *                   type: string
  *                 description: Lista de CPFs dos usuários a notificar
+ *               authToken: 
+ *                 type: string
+ *                 description: Token de autenticação para notificações
  *             required:
  *               - eventType
  *               - cpfs

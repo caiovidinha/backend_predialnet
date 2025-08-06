@@ -75,7 +75,10 @@ const sendNotificationController = async (req, res) => {
 
 
 async function webhookController(req, res) {
-  const { eventType, cpfs } = req.body;
+  const { eventType, cpfs, authToken } = req.body;
+  if (authToken !== process.env.PUSH_AUTH_TOKEN) {
+    return res.status(403).json({ error: "Acesso não autorizado" });
+  }
   if (!eventType || !Array.isArray(cpfs) || cpfs.length === 0) {
     return res.status(400).json({ error: "eventType ou lista de CPFs não fornecida" });
   }
