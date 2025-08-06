@@ -1,7 +1,6 @@
 const multer = require("multer");
 const xlsx = require("xlsx");
 const { addRowToSheet } = require("../models/googlesheets");
-const { createCard } = require("../models/trello");
 const logger = require("../utils/logger"); // ✅ adicionado
 
 // Configuração do Multer para upload de arquivos
@@ -57,59 +56,7 @@ const processAgendamento = async (req, res) => {
     }
 };
 
-/**
- * POST /agendamento/trello
- * Apenas envia cards para o Trello, sem tocar no Google Sheets.
- * Aceita JSON { listId, date, appointments } ou um arquivo CSV/XLSX + listId.
- */
-async function sendAgendamentoToTrello(req, res) {
-  try {
-    const listId = req.body.listId;
-    if (!listId) {
-      return res.status(400).json({ error: "Campo 'listId' é obrigatório" });
-    }
-
-    let rows = [];
-    if (req.file) {
-      // processa arquivo CSV/XLSX
-      const wb = xlsx.readFile(req.file.path);
-      const [sheetName] = wb.SheetNames;
-      rows = xlsx.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1 });
-      logger.info("📊 Dados extraídos do arquivo para Trello:", { count: rows.length });
-    } else {
-      // JSON puro
-      const { date, appointments } = req.body;
-      if (!date || isNaN(appointments)) {
-        return res.status(400).json({ error: "Campos 'date' e 'appointments' inválidos" });
-      }
-      rows = [[date, appointments]];
-      logger.info("📅 Agendamento Trello via JSON:", { date, appointments });
-    }
-
-    let sent = 0;
-    for (const [date, rawCount] of rows) {
-      const count = parseInt(rawCount, 10);
-      if (!date || isNaN(count)) {
-        logger.warn("⚠️ Linha inválida pulada:", { date, rawCount });
-        continue;
-      }
-      const name = `📅 ${date}`;
-      const desc = `Agendamentos: ${count}`;
-      await createCard(listId, name, desc);
-      sent++;
-    }
-
-    return res.status(200).json({
-      message: `✔️ ${sent} card(s) criado(s) na lista ${listId}`
-    });
-  } catch (err) {
-    logger.error("❌ Erro em sendAgendamentoToTrello:", { error: err.message });
-    return res.status(500).json({ error: "Erro interno ao enviar para Trello" });
-  }
-}
-
 module.exports = {
     upload,
     processAgendamento,
-    sendAgendamentoToTrello
 };
