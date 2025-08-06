@@ -1,5 +1,3 @@
-// routes/push.js
-
 /**
  * @swagger
  * tags:
@@ -8,11 +6,14 @@
 
 const express = require("express");
 const router = express.Router();
+
 const {
   saveTokenController,
   sendNotificationController,
   webhookController,
-  sendFilteredNotificationsController
+  sendFilteredNotificationsController,
+  getNotificationsController,    // 👈 importar
+  markReadController             // 👈 importar
 } = require("../controllers/push");
 
 /**
@@ -40,34 +41,10 @@ const {
  *     responses:
  *       200:
  *         description: Token salvo com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Token salvo com sucesso
  *       400:
  *         description: CPF ou token não fornecido
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: CPF ou token não fornecido
  *       500:
  *         description: Erro interno ao salvar token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Erro ao salvar token
  */
 router.post("/save-token", saveTokenController);
 
@@ -86,16 +63,12 @@ router.post("/save-token", saveTokenController);
  *             properties:
  *               title:
  *                 type: string
- *                 description: Título da notificação
  *               body:
  *                 type: string
- *                 description: Corpo da notificação
  *               data:
  *                 type: object
- *                 description: Dados adicionais enviados na notificação
  *               authToken:
  *                 type: string
- *                 description: Token de autenticação para uso deste endpoint
  *             required:
  *               - title
  *               - body
@@ -103,40 +76,10 @@ router.post("/save-token", saveTokenController);
  *     responses:
  *       202:
  *         description: Notificações enfileiradas com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 queued:
- *                   type: integer
- *                   description: Número de mensagens enfileiradas
- *                 notificationId:
- *                   type: string
- *                   description: ID da notificação criada
  *       403:
- *         description: Acesso não autorizado (token inválido)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Acesso não autorizado
+ *         description: Acesso não autorizado
  *       500:
  *         description: Erro interno ao enviar notificações
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Erro ao enfileirar notificações
  */
 router.post("/send", sendNotificationController);
 
@@ -144,7 +87,7 @@ router.post("/send", sendNotificationController);
  * @swagger
  * /push/send-filtered:
  *   post:
- *     summary: Envia notificações para usuários filtrados por metadata e/ou lista de CPFs
+ *     summary: Envia notificações filtradas por metadata e/ou lista de CPFs
  *     tags: [Push]
  *     requestBody:
  *       required: true
@@ -155,29 +98,21 @@ router.post("/send", sendNotificationController);
  *             properties:
  *               authToken:
  *                 type: string
- *                 description: Token de autenticação para uso deste endpoint
  *               title:
  *                 type: string
- *                 description: Título da notificação
  *               body:
  *                 type: string
- *                 description: Corpo da notificação
  *               data:
  *                 type: object
- *                 description: Dados adicionais enviados na notificação
  *               filters:
  *                 type: object
- *                 description: Filtros condicionais para envio
  *                 properties:
  *                   hasOpenBill:
  *                     type: boolean
- *                     description: Se o usuário possui fatura em aberto
  *                   addressContains:
  *                     type: string
- *                     description: Trecho do endereço para filtrar
  *                   cpfs:
  *                     type: array
- *                     description: Lista de CPFs a serem notificados
  *                     items:
  *                       type: string
  *             required:
@@ -188,53 +123,14 @@ router.post("/send", sendNotificationController);
  *     responses:
  *       202:
  *         description: Notificações enfileiradas com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 queued:
- *                   type: integer
- *                   description: Número de notificações enfileiradas
- *                 notificationId:
- *                   type: string
- *                   description: ID da notificação criada
  *       400:
  *         description: Payload inválido
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Payload inválido
  *       403:
  *         description: Acesso não autorizado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Acesso não autorizado
  *       500:
  *         description: Erro interno
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Erro interno
  */
-
- router.post("/send-filtered", sendFilteredNotificationsController);
+router.post("/send-filtered", sendFilteredNotificationsController);
 
 /**
  * @swagger
@@ -252,26 +148,121 @@ router.post("/send", sendNotificationController);
  *               eventType:
  *                 type: string
  *                 enum: [fatura-gerada, fatura-vencida]
- *                 description: Tipo de evento para notificação
  *               cpfs:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Lista de CPFs dos usuários a notificar
- *               authToken: 
+ *               authToken:
  *                 type: string
- *                 description: Token de autenticação para notificações
  *             required:
  *               - eventType
  *               - cpfs
+ *               - authToken
  *     responses:
  *       202:
  *         description: Notificações enfileiradas com sucesso
  *       400:
  *         description: Payload inválido
+ *       403:
+ *         description: Acesso não autorizado
  *       500:
  *         description: Erro interno
  */
 router.post("/webhook", webhookController);
+
+/**
+ * @swagger
+ * /push/notifications/{cpf}:
+ *   get:
+ *     summary: Lista notificações de um usuário (com status read/unread)
+ *     tags: [Push]
+ *     parameters:
+ *       - in: path
+ *         name: cpf
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: CPF do usuário
+ *     responses:
+ *       200:
+ *         description: Lista de notificações
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 notifications:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       title:
+ *                         type: string
+ *                       body:
+ *                         type: string
+ *                       data:
+ *                         type: object
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       read:
+ *                         type: boolean
+ *                       readAt:
+ *                         type: string
+ *                         format: date-time
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno
+ */
+router.get("/notifications/:cpf", getNotificationsController);
+
+/**
+ * @swagger
+ * /push/notifications/{id}/read:
+ *   patch:
+ *     summary: Marca uma notificação como lida ou não lida
+ *     tags: [Push]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do vínculo UserNotification
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               read:
+ *                 type: boolean
+ *             required:
+ *               - read
+ *     responses:
+ *       200:
+ *         description: Status de leitura atualizado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 read:
+ *                   type: boolean
+ *                 readAt:
+ *                   type: string
+ *                   format: date-time
+ *       400:
+ *         description: Campo 'read' inválido
+ *       500:
+ *         description: Erro interno
+ */
+router.patch("/notifications/:id/read", markReadController);
 
 module.exports = router;

@@ -8,14 +8,15 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(uuid())
-  cpf            String         @unique
-  email          String
-  password       String
-  refresh_token  RefreshToken?
-  password_token PasswordToken?
-  show_ad        ShowAd?
-  pushTokens     PushToken[]
+  id                String             @id @default(uuid())
+  cpf               String             @unique
+  email             String
+  password          String
+  refresh_token     RefreshToken?
+  password_token    PasswordToken?
+  show_ad           ShowAd?
+  pushTokens        PushToken[]
+  userNotifications UserNotification[]  // ← nova relação
 
   @@map("users")
 }
@@ -70,15 +71,16 @@ model PushToken {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
-  title     String
-  body      String?
-  data      Json?
-  status    String   @default("pending") // pending | sent | failed
-  tokens    Int      @default(0) // quantos tentamos
-  receipts  Json? // array de tickets do Expo
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String             @id @default(uuid())
+  title              String
+  body               String?
+  data               Json?
+  status             String             @default("pending")
+  tokens             Int                @default(0)
+  receipts           Json?              
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  userNotifications  UserNotification[] 
 
   @@index([createdAt])
   @@map("notifications")
@@ -91,4 +93,19 @@ model UserMetadata {
   updatedAt   DateTime @updatedAt
 
   @@map("user_metadata")
+}
+
+model UserNotification {
+  id             String       @id @default(uuid())
+  user           User         @relation(fields: [userId], references: [id])
+  userId         String
+  notification   Notification @relation(fields: [notificationId], references: [id])
+  notificationId String
+  read           Boolean      @default(false)
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@map("user_notifications")
+  @@index([userId])
+  @@index([notificationId])
 }
