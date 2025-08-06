@@ -1,7 +1,7 @@
 // controllers/push.js
 
 const { savePushToken, getAllTokens, getTokensByUserIds } = require("../models/push");
-const { createNotification } = require("../models/notification");
+const { createNotification } = require("../models/notifications");
 const {
   createMany: createUserNotifications,
   getByUserId,
