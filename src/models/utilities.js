@@ -252,7 +252,8 @@ const getClientStatusModel = async (codcliente) => {
             service_status,
             payment_status: {
                 status: payment.status,
-                valor: payment.valor || "-"
+                valor: payment.valor || "-",
+                vencimento: payment.vencimento || "-"
             },
             libtemp_status: libtemp?.status === 1
         };
