@@ -180,4 +180,38 @@ router.get("/libtemp/cliente/:codcliente", faturaController.consultarLibtempPorC
  */
 router.delete("/libtemp/:id", faturaController.deletarLibtempController);
 
+/**
+ * @swagger
+ * /fatura/past-status/{id}:
+ *   get:
+ *     summary: Contabiliza, entre as últimas faturas (exceto a atual), quantas estão em aberto e quantas estão vencidas
+ *     tags: [Fatura]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Código do cliente
+ *     responses:
+ *       200:
+ *         description: Quantidade de faturas em aberto e vencidas retornada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 open:
+ *                   type: integer
+ *                   description: Número de faturas ainda em aberto (vencimento futuro)
+ *                 overdue:
+ *                   type: integer
+ *                   description: Número de faturas já vencidas
+ */
+router.get(
+  "/past-status/:id",
+  faturaController.getPastInvoicesStatusController
+);
+
+
 module.exports = router;

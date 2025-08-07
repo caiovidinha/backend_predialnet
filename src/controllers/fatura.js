@@ -184,6 +184,59 @@ const deletarLibtempController = async (req, res) => {
     }
 };
 
+/**
+ * Controlador que conta, entre as últimas faturas (exceto a atual),
+ * quantas estão em aberto (vencimento futuro) e quantas já estão vencidas.
+ *
+ * GET /fatura/past-status/:id
+ * @param req.params.id {string} - Código do cliente
+ * @returns {200} { open: number, overdue: number }
+ */
+const getPastInvoicesStatusController = async (req, res) => {
+  const { id } = req.params;
+  try {
+    logger.info("Calculando status das faturas passadas", { id });
+
+    // 1) Busca as últimas 6 (incluindo a atual)
+    const result = await getLastSixInvoices(id);
+    // Suporta tanto retorno em array quanto em { faturas: [...] }
+    const all = Array.isArray(result)
+      ? result
+      : Array.isArray(result.faturas)
+      ? result.faturas
+      : [];
+
+    // 2) Busca a fatura atual para excluí-la
+    const current = await getCurrentInvoice(id);
+    const past = all.filter(inv => inv.id !== current.id);
+
+    // 3) Conta abertas vs vencidas
+    let open = 0;
+    let overdue = 0;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    past.forEach(inv => {
+      // se já tiver pago ou cancelado, ignora
+      if (inv.dta_pagamento || inv.cancelada) return;
+
+      const due = new Date(inv.dta_vencimento);
+      due.setHours(0,0,0,0);
+
+      if (due < today) {
+        overdue++;
+      } else {
+        open++;
+      }
+    });
+
+    return res.status(200).json({ open, overdue });
+  } catch (error) {
+    logger.error("Erro em getPastInvoicesStatusController", { error: error.message });
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
     getSecondCopyLinkController,
     getLastSixInvoicesController,
@@ -193,5 +246,6 @@ module.exports = {
     cadastrarLibtempController,
     consultarLibtempPorClienteController,
     deletarLibtempController,
-    setFaturaDigitalController
+    setFaturaDigitalController,
+    getPastInvoicesStatusController
 };
