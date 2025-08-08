@@ -196,24 +196,52 @@ const checkCurrentInvoiceStatus = async (id) => {
  * @returns {Promise<Object>} - Retorna a fatura atual.
  */
 const getCurrentInvoice = async (id) => {
-    try {
-        const faturas = await fetchFaturas(id);
-        const sortedFaturas = faturas.sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
-        
-        if (sortedFaturas.length === 0) {
-            throw new Error('Nenhuma fatura encontrada.');
-        }
-        
-        const currentFatura = sortedFaturas[0];
-        return { faturaAtual: currentFatura };
-    } catch (error) {
-        logger.error('Erro ao obter fatura atual', {
-            id,
-            error: error.message
-        });
-        throw error;
+  try {
+    const faturas = await fetchFaturas(id);
+    if (!Array.isArray(faturas) || faturas.length === 0) {
+      throw new Error('Nenhuma fatura encontrada.');
     }
+
+    const isOpen = (f) => !f.cancelada && (f.dta_pagamento == null);
+    const isActive = (f) => !f.cancelada; // pra ignorar canceladas no fallback
+
+    const toTime = (d) => new Date(`${d}T00:00:00`).getTime(); // 'YYYY-MM-DD' -> ms (local)
+
+    // 1) Abretes ordenadas da MAIS ANTIGA pra MAIS RECENTE pelo vencimento
+    const abertasOrdenadas = faturas
+      .filter(isOpen)
+      .sort((a, b) => toTime(a.dta_vencimento) - toTime(b.dta_vencimento));
+
+    let faturaAtual;
+
+    if (abertasOrdenadas.length > 0) {
+      // pega a ABERTA mais antiga
+      faturaAtual = abertasOrdenadas[0];
+    } else {
+      // 2) Todas pagas/canceladas: pega a ATIVA mais recente
+      const ativasOrdenadasDesc = faturas
+        .filter(isActive)
+        .sort((a, b) => toTime(b.dta_vencimento) - toTime(a.dta_vencimento));
+
+      if (ativasOrdenadasDesc.length === 0) {
+        // só sobrou cancelada mesmo
+        faturaAtual = faturas.sort(
+          (a, b) => toTime(b.dta_vencimento) - toTime(a.dta_vencimento)
+        )[0];
+      } else {
+        faturaAtual = ativasOrdenadasDesc[0];
+      }
+    }
+
+    const outrasPendentes = abertasOrdenadas.filter(f => f.boleta !== faturaAtual.boleta);
+
+    return { faturaAtual, outrasPendentes };
+  } catch (error) {
+    logger.error('Erro ao obter fatura atual', { id, error: error.message });
+    throw error;
+  }
 };
+
 
 /**
  * Função para cadastrar uma liberação temporária.
