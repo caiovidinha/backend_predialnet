@@ -217,7 +217,7 @@ const getPastInvoicesStatusController = async (req, res) => {
       // se já tiver pago ou cancelado, ignora
       if (inv.dta_pagamento || inv.cancelada) return;
 
-      const due = new Date(inv.vencimento);
+      const due = new Date(inv.dta_vencimento);
       due.setHours(0,0,0,0);
 
       if (due < today) {

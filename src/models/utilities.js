@@ -219,7 +219,9 @@ const getClientStatusModel = async (codcliente) => {
         const [payment, libtemp] = await Promise.all([
             (async () => {
                 try {
-                    return await checkCurrentInvoiceStatus(codcliente);
+                    const curr=await checkCurrentInvoiceStatus(codcliente);
+                    console.log(curr)
+                    return curr
                 } catch (err) {
                     if (
                         err.message.includes("sem fatura") ||

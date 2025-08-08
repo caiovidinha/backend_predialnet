@@ -174,13 +174,13 @@ const checkCurrentInvoiceStatus = async (id) => {
         let status = 'em aberto';
         if (currentFatura.dta_pagamento) {
             status = 'paga';
-        } else if (new Date(currentFatura.vencimento) < today) {
+        } else if (new Date(currentFatura.dta_vencimento) < today) {
             status = 'atrasada';
         } else {
             status = 'em aberto';
         }
-        
-        return { status: status, valor: currentFatura.valor };
+        console.log(currentFatura)
+        return { status: status, valor: currentFatura.valor, vencimento: currentFatura.dta_vencimento };
     } catch (error) {
         logger.error('Erro ao verificar status da fatura atual', {
             id,
