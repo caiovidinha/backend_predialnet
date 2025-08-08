@@ -250,12 +250,14 @@ const getClientStatusModel = async (codcliente) => {
             })()
         ]);
 
+        const [ano, mes, dia] = payment.vencimento.split('-');
+        const vencimento = `${dia}/${mes}/${ano}`;
         return {
             service_status,
             payment_status: {
                 status: payment.status,
                 valor: payment.valor || "-",
-                vencimento: payment.vencimento || "-"
+                vencimento: vencimento || "-"
             },
             libtemp_status: libtemp?.status === 1
         };
