@@ -206,9 +206,6 @@ const getPastInvoicesStatusController = async (req, res) => {
       ? result.faturas
       : [];
 
-    // 2) Busca a fatura atual para excluí-la
-    const current = await getCurrentInvoice(id);
-    const past = all.filter(inv => inv.id !== current.id);
 
     // 3) Conta abertas vs vencidas
     let open = 0;
@@ -216,7 +213,7 @@ const getPastInvoicesStatusController = async (req, res) => {
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    past.forEach(inv => {
+    all.forEach(inv => {
       // se já tiver pago ou cancelado, ignora
       if (inv.dta_pagamento || inv.cancelada) return;
 
