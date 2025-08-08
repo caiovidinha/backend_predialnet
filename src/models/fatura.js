@@ -156,38 +156,64 @@ const getPixFromLastOpenInternetInvoice = async (id) => {
 };
 
 /**
- * Função para verificar o status da fatura atual (em aberto, paga ou atrasada).
- * @param {string} id - ID do usuário ou da fatura.
- * @returns {Promise<Object>} - Retorna um objeto com o status da fatura.
+ * Verifica o status da "fatura atual" seguindo a regra:
+ * - Se houver faturas em aberto, usa a MAIS ANTIGA (menor dta_vencimento).
+ * - Se todas estiverem pagas/canceladas, usa a ATIVA (não cancelada) mais recente.
  */
 const checkCurrentInvoiceStatus = async (id) => {
-    try {
-        const faturas = await fetchFaturas(id);
-        const sortedFaturas = faturas.sort((a, b) => new Date(b.data_emissao) - new Date(a.data_emissao));
-        
-        if (sortedFaturas.length === 0) {
-            throw new Error('Nenhuma fatura encontrada.');
-        }
-        
-        const currentFatura = sortedFaturas[0];
-        const today = new Date();
-        let status = 'em aberto';
-        if (currentFatura.dta_pagamento) {
-            status = 'paga';
-        } else if (new Date(currentFatura.dta_vencimento) < today) {
-            status = 'atrasada';
-        } else {
-            status = 'em aberto';
-        }
-        console.log(currentFatura)
-        return { status: status, valor: currentFatura.valor, vencimento: currentFatura.dta_vencimento };
-    } catch (error) {
-        logger.error('Erro ao verificar status da fatura atual', {
-            id,
-            error: error.message
-        });
-        throw error;
+  try {
+    const faturas = await fetchFaturas(id);
+    if (!Array.isArray(faturas) || faturas.length === 0) {
+      throw new Error('Nenhuma fatura encontrada.');
     }
+
+    const isOpen = (f) => !f.cancelada && f.dta_pagamento == null;
+    const isActive = (f) => !f.cancelada;
+
+    const toTime = (d) => new Date(`${d}T00:00:00`).getTime(); // 'YYYY-MM-DD' -> ms
+    const hojeMs = toTime(new Date().toISOString().slice(0, 10)); // compara por data (sem hora)
+
+    // 1) Abertas (ordenadas da MAIS ANTIGA p/ a MAIS RECENTE pelo vencimento)
+    const abertasOrdenadas = faturas
+      .filter(isOpen)
+      .sort((a, b) => toTime(a.dta_vencimento) - toTime(b.dta_vencimento));
+
+    let faturaAtual;
+
+    if (abertasOrdenadas.length > 0) {
+      faturaAtual = abertasOrdenadas[0];
+    } else {
+      // 2) Todas pagas/canceladas => pega a ATIVA mais recente
+      const ativasOrdenadasDesc = faturas
+        .filter(isActive)
+        .sort((a, b) => toTime(b.dta_vencimento) - toTime(a.dta_vencimento));
+
+      faturaAtual = (ativasOrdenadasDesc[0] ?? faturas.sort(
+        (a, b) => toTime(b.dta_vencimento) - toTime(a.dta_vencimento)
+      )[0]);
+    }
+
+    // Status: paga | atrasada | em aberto
+    let status = 'em aberto';
+    if (faturaAtual.dta_pagamento) {
+      status = 'paga';
+    } else if (toTime(faturaAtual.dta_vencimento) < hojeMs) {
+      status = 'atrasada';
+    } else {
+      status = 'em aberto';
+    }
+
+    return {
+      status,
+      valor: faturaAtual.valor,
+      vencimento: faturaAtual.dta_vencimento,
+      boleta: faturaAtual.boleta,
+      link: faturaAtual.link,
+    };
+  } catch (error) {
+    logger.error('Erro ao verificar status da fatura atual', { id, error: error.message });
+    throw error;
+  }
 };
 
 /**
