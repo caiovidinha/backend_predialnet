@@ -156,4 +156,52 @@ utilitiesRouter.post("/controle-parental", utilitiesController.updateControlePar
  */
 utilitiesRouter.get("/status/:codcliente", utilitiesController.getClientStatusController);
 
+/**
+ * @swagger
+ * /utils/monitoramento/{codcliente}:
+ *   get:
+ *     summary: Retorna status geral do cliente (serviços, fatura, liberação temporária)
+ *     tags: [Utilitários]
+ *     parameters:
+ *       - in: path
+ *         name: codcliente
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Código do cliente
+ *     responses:
+ *       200:
+ *         description: Status retornado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 service_status:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id_ponto:
+ *                         type: number
+ *                       status_conexao:
+ *                         type: string
+ *                       velocidade:
+ *                         type: string
+ *                 payment_status:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     valor:
+ *                       type: string
+ *                 libtemp_status:
+ *                   type: boolean
+ *       400:
+ *         description: Código do cliente não fornecido
+ *       500:
+ *         description: Erro interno
+ */
+utilitiesRouter.get("/monitoramento/:codcliente", utilitiesController.getAlertMessageController);
+
 module.exports = utilitiesRouter;

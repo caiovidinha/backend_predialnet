@@ -2,7 +2,7 @@
 
 const logger = require("../utils/logger");
 const { manageShowAd } = require("../models/utilities");
-const { updateSerAdicionalModel, updateControleParentalModel, getUserByIDModel, getClientStatusModel } = require("../models/utilities");
+const { updateSerAdicionalModel, updateControleParentalModel, getUserByIDModel, getClientStatusModel, getAlertMessageModel } = require("../models/utilities");
 
 /**
  * Controlador para gerenciar a exibição de anúncios (show_ad).
@@ -103,11 +103,32 @@ const getClientStatusController = async (req, res) => {
     }
 };
 
+const getAlertMessageController = async (req, res) => {
+    const { codcliente } = req.params;
+
+    if (!codcliente) {
+        logger.warn("codcliente não fornecido em getClientStatus");
+        return res.status(400).json({ error: "codcliente não fornecido." });
+    }
+
+    try {
+        const msg_monitoramento = await getAlertMessageModel(codcliente);
+        return res.status(200).json(msg_monitoramento);
+    } catch (error) {
+        logger.error("Erro ao consultar status geral do cliente", {
+            codcliente,
+            error: error.message
+        });
+        return res.status(500).json({ error: "Erro ao consultar status do cliente." });
+    }
+};
+
 
 module.exports = {
     toggleShowAd,
     updateSerAdicionalController,
     updateControleParentalController,
     getUserByID,
-    getClientStatusController 
+    getClientStatusController,
+    getAlertMessageController
 };

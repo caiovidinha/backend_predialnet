@@ -270,11 +270,28 @@ const getClientStatusModel = async (codcliente) => {
     }
 };
 
+const getAlertMessageModel = async (codcliente) => {
+    try {
+        const clienteData = await getUserByIDModel(codcliente); 
+        return clienteData.cliente.msg_monitoramento;
+    } catch (error) {
+        logger.error("Erro em getAlertMessageModel", {
+            codcliente,
+            error: error.message
+        });
+        throw error;
+    }
+};
+
+
+
+
 
 module.exports = {
     manageShowAd,
     updateSerAdicionalModel,
     updateControleParentalModel,
     getUserByIDModel,
-    getClientStatusModel
+    getClientStatusModel,
+    getAlertMessageModel
 };
