@@ -1,6 +1,10 @@
 const express = require("express");
 const faturaController = require("../controllers/fatura");
+const { validateJWT } = require("../models/auth");
 const router = express.Router();
+
+// Todas as rotas de fatura exigem JWT válido
+router.use(validateJWT);
 
 /**
  * @swagger

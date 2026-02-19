@@ -4,6 +4,7 @@ require('dd-trace').init({
 
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 
 const requestIntercepter = require("./utils/requestIntercepter");
 const loginRouter = require("./routes/loginRouter");
@@ -17,9 +18,26 @@ const trelloRouter = require("./routes/trelloRouter");
 const { swaggerUi, specs } = require("./utils/swagger");
 const swaggerAuthMiddleware = require("./middlewares/authSwagger");
 
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://predialnet.com.br").split(",");
+
 const app = express();
 
-app.use(cors());
+// Security headers
+app.use(helmet());
+
+// Restrict CORS to known origins
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl in dev)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS bloqueado para origem: ${origin}`));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-access-token"],
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

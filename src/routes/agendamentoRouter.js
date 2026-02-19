@@ -1,5 +1,6 @@
 const express = require("express");
 const { upload, processAgendamento } = require("../controllers/agendamentoController");
+const { validateJWT } = require("../models/auth");
 
 const router = express.Router();
 
@@ -28,6 +29,6 @@ const router = express.Router();
  *       500:
  *         description: Erro interno ao processar agendamento
  */
-router.post("/", upload.single("file"), processAgendamento);
+router.post("/", validateJWT, upload.single("file"), processAgendamento);
 
 module.exports = router;

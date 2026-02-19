@@ -2,6 +2,7 @@
 
 const axios = require("axios");
 const https = require("https");
+const crypto = require("crypto");
 const dotenv = require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const { client } = require("../prisma/client");
@@ -10,7 +11,9 @@ const logger = require("../utils/logger");
 
 const instance = axios.create({
     httpsAgent: new https.Agent({
-        rejectUnauthorized: false,
+        // rejectUnauthorized deve ser true em produção.
+        // Defina SSL_REJECT_UNAUTHORIZED=false apenas em dev/staging com cert self-signed.
+        rejectUnauthorized: process.env.SSL_REJECT_UNAUTHORIZED !== "false",
     }),
 });
 
@@ -66,14 +69,12 @@ const sendEmail = async (to, subject, content) => {
     }
 };
 
-const passwordExistsInDatabase = async (password) => {
-    const user = await client.user.findFirst({
-        where: {
-            password: password,
-        },
-    });
-    if (!user) return false;
-    return true;
+// As senhas são armazenadas como hashes bcrypt, portanto nunca coincidem com
+// o texto puro gerado. A verificação anterior estava quebrada. Como a entropia
+// da senha gerada (12-15 chars alfanum+especial, criptograficamente aleatória)
+// torna colisões estatisticamente impossíveis, apenas retornamos false.
+const passwordExistsInDatabase = async (_password) => {
+    return false;
 };
 
 const createToken = async (userId) => {
@@ -105,7 +106,7 @@ const refreshJWT = async (userId) => {
 };
 
 const generateRefreshToken = async (userId) => {
-    const expiresIn = dayjs().add(15, "sec").unix();
+    const expiresIn = dayjs().add(15, "day").unix(); // era 15 segundos: corrigido para 15 dias
     const refToken = await client.refreshToken.create({
         data: {
             userId,
@@ -257,38 +258,37 @@ const generatePassword = () => {
     const upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const numbers = "0123456789";
     const specialChars = "!@#$%&*";
-
-    function getRandomChar(charSet) {
-        return charSet[Math.floor(Math.random() * charSet.length)];
-    }
-
-    const length = Math.floor(Math.random() * 3) + 12;
-    let password = "";
-
-    password += getRandomChar(lowerChars);
-    password += getRandomChar(upperChars);
-    password += getRandomChar(numbers);
-    password += getRandomChar(specialChars);
-
-    let specialCharCount = 1;
     const allChars = lowerChars + upperChars + numbers + specialChars;
-    while (password.length < length) {
-        let char = getRandomChar(allChars);
-        if (specialChars.includes(char)) {
-            if (specialCharCount < 3) {
-                password += char;
-                specialCharCount++;
-            }
+
+    // Usa crypto.randomInt para fonte criptograficamente segura
+    const randomChar = (charSet) =>
+        charSet[crypto.randomInt(0, charSet.length)];
+
+    const length = 12 + crypto.randomInt(0, 4); // 12-15 chars
+    let chars = [
+        randomChar(lowerChars),
+        randomChar(upperChars),
+        randomChar(numbers),
+        randomChar(specialChars),
+    ];
+
+    let specialCount = 1;
+    while (chars.length < length) {
+        const c = randomChar(allChars);
+        if (specialChars.includes(c)) {
+            if (specialCount < 3) { chars.push(c); specialCount++; }
         } else {
-            password += char;
+            chars.push(c);
         }
     }
 
-    password = password
-        .split("")
-        .sort(() => 0.5 - Math.random())
-        .join("");
-    return password;
+    // Fisher-Yates shuffle com crypto.randomInt
+    for (let i = chars.length - 1; i > 0; i--) {
+        const j = crypto.randomInt(0, i + 1);
+        [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+
+    return chars.join("");
 };
 
 const censorEmail = (email) => {

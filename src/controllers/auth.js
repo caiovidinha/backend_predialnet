@@ -260,20 +260,20 @@ forgotPassword = async (req, res) => {
         const token = await generatePasswordToken(user.id);
         const passToken = token.id;
 
-        // Criar URL de redefinição de senha
-        const urlResetPassword = `https://www.predialnet.com.br/redefinir-senha?token=${passToken}&email=${user.email}`;
         if (insideApp) {
-            logger.info("Solicitação de redefinição de senha via app. Link gerado diretamente.", {
+            // Retorna apenas o token — o app constrói o deep-link localmente.
+            // Não expor o e-mail do usuário na resposta.
+            logger.info("Solicitação de redefinição de senha via app. Token gerado.", {
                 cpf: userCredential,
-                email: user.email,
-                link: urlResetPassword
             });
-
             return res.status(200).json({
-                message: "Link de redefinição gerado com sucesso!",
-                url: urlResetPassword,
+                message: "Token de redefinição gerado com sucesso!",
+                resetToken: passToken,
             });
         }
+        // Criar URL de redefinição de senha (apenas para flow web)
+        const urlResetPassword = `https://www.predialnet.com.br/redefinir-senha?token=${passToken}&email=${user.email}`;
+
         // Censurar e-mail para o retorno
         const hashEmail = censorEmail(user.email);
 
@@ -384,6 +384,17 @@ resetPassword = async (req, res) => {
     // }
     
     logger.info("Senha redefinida com sucesso:", { email });
+
+    // Invalida o token após uso para evitar reutilização
+    for (const user of users) {
+        const deletedToken = await client.passwordToken.deleteMany({
+            where: {
+                userId: user.id,
+            },
+        });
+        if (deletedToken.count > 0) break;
+    }
+
     return res.status(200).json({
         status: "Sucesso",
         mensagem: "Senha alterada com sucesso!",

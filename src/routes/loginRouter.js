@@ -1,9 +1,28 @@
 const express = require("express");
 const cors = require("cors");
+const { rateLimit } = require("express-rate-limit");
 const constrollerAuth = require("../controllers/auth");
 const controllerRefreshToken = require("../controllers/refreshToken");
-// const { validateJWT } = require("../models/auth");
+const { validateJWT } = require("../models/auth");
 const loginRouter = express.Router();
+
+// Rate limiter para rotas sensíveis (login, recuperação de senha, criação de usuário)
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Muitas tentativas. Tente novamente em 15 minutos." },
+});
+
+// Middleware de autorização para endpoints administrativos internos
+const requireAdminToken = (req, res, next) => {
+    const token = req.headers["x-admin-token"];
+    if (!token || token !== process.env.ADMIN_SECRET_TOKEN) {
+        return res.status(403).json({ error: "Acesso não autorizado" });
+    }
+    next();
+};
 
 /**
  * @swagger
@@ -36,7 +55,7 @@ loginRouter.get("/ping", cors(), constrollerAuth.getOk);
  *       201:
  *         description: Retorna e-mails encontrados para confirmação
  */
-loginRouter.post("/newUser", constrollerAuth.newUser);
+loginRouter.post("/newUser", authLimiter, constrollerAuth.newUser);
 
 /**
  * @swagger
@@ -59,7 +78,7 @@ loginRouter.post("/newUser", constrollerAuth.newUser);
  *       201:
  *         description: Usuário criado e senha enviada
  */
-loginRouter.post("/createUser", constrollerAuth.createUser);
+loginRouter.post("/createUser", authLimiter, constrollerAuth.createUser);
 
 /**
  * @swagger
@@ -84,7 +103,7 @@ loginRouter.post("/createUser", constrollerAuth.createUser);
  *       200:
  *         description: E-mail atualizado com sucesso
  */
-loginRouter.post("/update-email", constrollerAuth.updateEmail);
+loginRouter.post("/update-email", authLimiter, constrollerAuth.updateEmail);
 
 /**
  * @swagger
@@ -107,7 +126,7 @@ loginRouter.post("/update-email", constrollerAuth.updateEmail);
  *       201:
  *         description: Login bem-sucedido com tokens e dados do cliente
  */
-loginRouter.post("/login", constrollerAuth.login);
+loginRouter.post("/login", authLimiter, constrollerAuth.login);
 
 /**
  * @swagger
@@ -155,7 +174,7 @@ loginRouter.post("/refresh-token", controllerRefreshToken.renewToken);
  *         description: Link de redefinição enviado por e-mail ou retornado diretamente se insideApp for true
  */
 
-loginRouter.post("/forgot-password", constrollerAuth.forgotPassword);
+loginRouter.post("/forgot-password", authLimiter, constrollerAuth.forgotPassword);
 
 /**
  * @swagger
@@ -205,7 +224,7 @@ loginRouter.post("/reset-password", constrollerAuth.resetPassword);
  *       200:
  *         description: E-mail enviado com sucesso
  */
-loginRouter.post('/emails', constrollerAuth.handleEmail);
+loginRouter.post('/emails', requireAdminToken, constrollerAuth.handleEmail);
 
 /**
  * @swagger
@@ -270,6 +289,6 @@ loginRouter.get("/must-change-password/:cpf", constrollerAuth.mustChangePassword
  *       500:
  *         description: Erro interno no servidor
  */
-loginRouter.post("/update-email-censored", constrollerAuth.updateUserEmail);
+loginRouter.post("/update-email-censored", validateJWT, constrollerAuth.updateUserEmail);
 
 module.exports = loginRouter;

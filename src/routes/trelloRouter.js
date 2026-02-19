@@ -1,5 +1,6 @@
 const express = require("express");
 const { sendClientToTrello } = require("../controllers/trelloController");
+const { validateJWT } = require("../models/auth");
 const router = express.Router();
 
 /**
@@ -56,6 +57,6 @@ const router = express.Router();
  *       500:
  *         description: Erro interno
  */
-router.post("/clientes", sendClientToTrello);
+router.post("/clientes", validateJWT, sendClientToTrello);
 
 module.exports = router;

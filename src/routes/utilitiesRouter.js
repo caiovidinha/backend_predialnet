@@ -1,9 +1,11 @@
-// const { validateJWT } = require("../models/auth");
+const { validateJWT } = require("../models/auth");
 const utilitiesController = require("../controllers/utilities")
 const express = require("express");
 
 const utilitiesRouter = express.Router();
-// utilitiesRouter.use(validateJWT);
+
+// Todas as rotas de utilidades exigem JWT válido
+utilitiesRouter.use(validateJWT);
 
 /**
  * @swagger

@@ -6,6 +6,7 @@
 
 const express = require("express");
 const router = express.Router();
+const { validateJWT } = require("../models/auth");
 
 const {
   saveTokenController,
@@ -46,7 +47,7 @@ const {
  *       500:
  *         description: Erro interno ao salvar token
  */
-router.post("/save-token", saveTokenController);
+router.post("/save-token", validateJWT, saveTokenController);
 
 /**
  * @swagger
