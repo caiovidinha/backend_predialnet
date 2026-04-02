@@ -13,12 +13,14 @@ const utilitiesRouter = require("./routes/utilitiesRouter");
 const agendamentoRouter = require("./routes/agendamentoRouter");
 const pushRouter = require("./routes/pushRouter");
 const trelloRouter = require("./routes/trelloRouter");
-const messagesRouter = require("./routes/messagesRouter");
 
 const { swaggerUi, specs } = require("./utils/swagger");
 const swaggerAuthMiddleware = require("./middlewares/authSwagger");
 
 const app = express();
+app.use((req, res, next) => {
+        try {     decodeURIComponent(req.path);   }
+        catch (err) {     return res.status(400).send("Bad Request");   }   next(); });
 
 app.use(cors());
 app.use(express.json());
@@ -32,7 +34,6 @@ app.use("/utils", utilitiesRouter);
 app.use("/agendamento", agendamentoRouter);
 app.use("/push", pushRouter);
 app.use("/trello", trelloRouter);
-app.use("/messages", messagesRouter);
 
 // Proteger só a rota principal do Swagger UI
 app.get("/docs", swaggerAuthMiddleware, (req, res, next) => {
@@ -41,5 +42,6 @@ app.get("/docs", swaggerAuthMiddleware, (req, res, next) => {
 
 // Servir os assets normalmente (sem proteção)
 app.use("/docs", swaggerUi.serve);
+app.use((err, req, res, next) => {   if (err instanceof URIError) {     return res.status(400).send("Malformed URI");   }   next(err); });
 
 module.exports = app;

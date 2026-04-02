@@ -3,3 +3,4 @@ build
 .env
 credentials.json
 /uploads
+DEPLOY.md
