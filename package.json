@@ -8,6 +8,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "auth": "nodemon auth-service/server.js",
+    "migrate": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
     "prisma-migrate-dev": "docker exec app_predialnet npx prisma migrate dev --name init"
   },
   "keywords": [],

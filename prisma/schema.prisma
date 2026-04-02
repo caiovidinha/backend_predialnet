@@ -109,3 +109,41 @@ model UserNotification {
   @@index([userId])
   @@index([notificationId])
 }
+
+// ─── App Messages ────────────────────────────────────────────────────────────
+
+enum TargetingType {
+  GLOBAL
+  CLIENTE
+  CIDADE
+  BAIRRO
+  RUA
+  CEP
+  CEP_NUMERO
+}
+
+model AppMessage {
+  id          String             @id @default(uuid())
+  title       String
+  msg_cliente String             @db.Text
+  timeout_sec Int                @default(10)
+  active      Boolean            @default(true)
+  deleted_at  DateTime?
+  created_at  DateTime           @default(now())
+  updated_at  DateTime           @updatedAt
+  targets     AppMessageTarget[]
+
+  @@index([active, deleted_at])
+  @@map("app_messages")
+}
+
+model AppMessageTarget {
+  id              String        @id @default(uuid())
+  message         AppMessage    @relation(fields: [messageId], references: [id])
+  messageId       String
+  targeting_type  TargetingType
+  targeting_value String        @default("*")
+
+  @@index([targeting_type, targeting_value])
+  @@map("app_message_targets")
+}

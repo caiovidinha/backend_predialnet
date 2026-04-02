@@ -3,6 +3,7 @@
 const logger = require("../utils/logger");
 const { manageShowAd } = require("../models/utilities");
 const { updateSerAdicionalModel, updateControleParentalModel, getUserByIDModel, getClientStatusModel, getAlertMessageModel } = require("../models/utilities");
+const { findMessageForClient } = require("../models/messages");
 
 /**
  * Controlador para gerenciar a exibição de anúncios (show_ad).
@@ -70,10 +71,28 @@ const updateControleParentalController = async (req, res) => {
 const getUserByID = async (req, res) => {
     try {
         const { id } = req.params;
-    
-        // Chamar a função do modelo
+
         const response = await getUserByIDModel(id);
-    
+
+        // Inject our DB message with priority over the external API message
+        try {
+            const cpf = response?.cliente?.inscricao || null;
+            const cidade = response?.cliente?.cidade || null;
+            const bairro = response?.cliente?.bairro || null;
+            const rua = response?.cliente?.logradouro || null;
+            const cep = response?.cliente?.cep || null;
+            const numero = response?.cliente?.numero || null;
+            const ourMessage = await findMessageForClient({ cpf, cidade, bairro, rua, cep, numero });
+            if (ourMessage) {
+                response.cliente = {
+                    ...response.cliente,
+                    msg_monitoramento: ourMessage,
+                };
+            }
+        } catch (msgError) {
+            logger.warn("Falha ao buscar mensagem do banco, usando mensagem da API externa", { id, error: msgError.message });
+        }
+
         logger.info("getUserByID executado com sucesso", { id });
         res.status(200).json({ data: response });
     } catch (error) {

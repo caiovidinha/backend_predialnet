@@ -4,6 +4,7 @@ const https = require("https");
 const logger = require("../utils/logger");
 const { checkCurrentInvoiceStatus, consultarLibtempPorCliente } = require("../models/fatura");
 const { log } = require("console");
+const { findMessageForClient } = require("./messages");
 
 const instance = axios.create({
     httpsAgent: new https.Agent({
@@ -272,12 +273,63 @@ const getClientStatusModel = async (codcliente) => {
 
 const getAlertMessageModel = async (codcliente) => {
     try {
-        const clienteData = await getUserByIDModel(codcliente); 
-        return clienteData.cliente.msg_monitoramento;
+        const clienteData = await getUserByIDModel(codcliente);
+        const externalMsg = clienteData?.cliente?.msg_monitoramento || null;
+
+        // Our DB message takes priority over the external API message
+        const cpf = clienteData?.cliente?.inscricao || null;
+        const cidade = clienteData?.cliente?.cidade || null;
+        const bairro = clienteData?.cliente?.bairro || null;
+        const rua = clienteData?.cliente?.logradouro || null;
+        const cep = clienteData?.cliente?.cep || null;
+        const numero = clienteData?.cliente?.numero || null;
+        const ourMsg = await findMessageForClient({ cpf, cidade, bairro, rua, cep, numero });
+
+        return ourMsg || externalMsg;
     } catch (error) {
         logger.error("Erro em getAlertMessageModel", {
             codcliente,
             error: error.message
+        });
+        throw error;
+    }
+};
+
+/**
+ * Returns all CPFs from local users table (for GERAL targeting).
+ */
+const getAllUserCpfsModel = async () => {
+    const users = await client.user.findMany({ select: { cpf: true } });
+    return users.map(u => u.cpf);
+};
+
+/**
+ * Queries UAIPI by-address endpoint with the given params.
+ * Pass only the params relevant to the desired filter:
+ *   { cidade } | { bairro } | { cep } | { cep, numero }
+ * Returns an array of CPF strings.
+ */
+const getClientsByAddressModel = async ({ cidade, bairro, cep, numero } = {}) => {
+    const token = await loginAPI();
+    try {
+        const params = {};
+        if (cidade) params.cidade = cidade;
+        if (bairro) params.bairro = bairro;
+        if (cep) params.cep = cep;
+        if (numero) params.numero = numero;
+
+        const response = await instance.get('https://uaipi.predialnet.com.br/v1/clientes/by-address', {
+            headers: { Authorization: `Bearer ${token}` },
+            params,
+        });
+
+        const data = response.data?.data ?? response.data;
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        logger.error('Erro ao buscar clientes por endereço', {
+            cidade, bairro, cep, numero,
+            error: error.message,
+            response: error.response?.data,
         });
         throw error;
     }
@@ -293,5 +345,7 @@ module.exports = {
     updateControleParentalModel,
     getUserByIDModel,
     getClientStatusModel,
-    getAlertMessageModel
+    getAlertMessageModel,
+    getAllUserCpfsModel,
+    getClientsByAddressModel,
 };

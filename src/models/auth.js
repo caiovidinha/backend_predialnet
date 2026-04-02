@@ -180,6 +180,13 @@ const updateEmailOnUAIPI = async ({ email, codcliente, inscricao }) => {
 const validateJWT = async (req, res, next) => {
     const token = req.headers["x-access-token"];
 
+    // Admin dashboard bypass — token fixo definido em ADMIN_BYPASS_TOKEN
+    if (process.env.ADMIN_BYPASS_TOKEN && token === process.env.ADMIN_BYPASS_TOKEN) {
+        req.userId = "admin-dashboard";
+        req.cpf = null;
+        return next();
+    }
+
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, async (err, decoded) => {
         if (err) return res.status(401).end();
 
