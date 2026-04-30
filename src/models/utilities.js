@@ -324,6 +324,13 @@ const getClientsByAddressModel = async ({ cidade, bairro, cep, numero } = {}) =>
         });
 
         const data = response.data?.data ?? response.data;
+        logger.info('Resposta bruta by-address', {
+            params,
+            statusCode: response.status,
+            isArray: Array.isArray(data),
+            length: Array.isArray(data) ? data.length : null,
+            sample: Array.isArray(data) ? data[0] : data,
+        });
         if (!Array.isArray(data)) return [];
         return data.map(item => item.cliente?.inscricao).filter(Boolean);
     } catch (error) {
