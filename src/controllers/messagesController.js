@@ -37,11 +37,17 @@ const createMessageController = async (req, res) => {
     }
 
     try {
+        logger.info('Criando mensagem', { title, timeout_sec, targetsCount: targets?.length ?? 0 });
         const message = await createMessage({ title, msg_cliente, timeout_sec, targets });
         logger.info('Mensagem de aviso criada', { id: message.id, title });
         return res.status(201).json(message);
     } catch (error) {
-        logger.error('Erro ao criar mensagem', { error: error.message });
+        logger.error('Erro ao criar mensagem', {
+            error: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack,
+        });
         return res.status(500).json({ error: 'Erro ao criar mensagem.' });
     }
 };
@@ -52,10 +58,17 @@ const listMessagesController = async (req, res) => {
     const includeInactive = req.query.includeInactive === 'true';
 
     try {
+        logger.info('Listando mensagens', { page, limit, includeInactive });
         const result = await listMessages({ page, limit, includeInactive });
+        logger.info('Mensagens listadas', { total: result.total, returned: result.items.length });
         return res.status(200).json(result);
     } catch (error) {
-        logger.error('Erro ao listar mensagens', { error: error.message });
+        logger.error('Erro ao listar mensagens', {
+            error: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack,
+        });
         return res.status(500).json({ error: 'Erro ao listar mensagens.' });
     }
 };
@@ -64,11 +77,18 @@ const getMessageController = async (req, res) => {
     const { id } = req.params;
 
     try {
+        logger.info('Buscando mensagem por ID', { id });
         const message = await getMessageById(id);
         if (!message) return res.status(404).json({ error: 'Mensagem não encontrada.' });
         return res.status(200).json(message);
     } catch (error) {
-        logger.error('Erro ao buscar mensagem', { id, error: error.message });
+        logger.error('Erro ao buscar mensagem', {
+            id,
+            error: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack,
+        });
         return res.status(500).json({ error: 'Erro ao buscar mensagem.' });
     }
 };
@@ -78,6 +98,7 @@ const updateMessageController = async (req, res) => {
     const { title, msg_cliente, timeout_sec, active } = req.body;
 
     try {
+        logger.info('Atualizando mensagem', { id, fields: { title, msg_cliente, timeout_sec, active } });
         const existing = await getMessageById(id);
         if (!existing) return res.status(404).json({ error: 'Mensagem não encontrada.' });
 
@@ -85,7 +106,13 @@ const updateMessageController = async (req, res) => {
         logger.info('Mensagem atualizada', { id });
         return res.status(200).json(updated);
     } catch (error) {
-        logger.error('Erro ao atualizar mensagem', { id, error: error.message });
+        logger.error('Erro ao atualizar mensagem', {
+            id,
+            error: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack,
+        });
         return res.status(500).json({ error: 'Erro ao atualizar mensagem.' });
     }
 };
@@ -94,6 +121,7 @@ const deleteMessageController = async (req, res) => {
     const { id } = req.params;
 
     try {
+        logger.info('Removendo mensagem (soft delete)', { id });
         const existing = await getMessageById(id);
         if (!existing) return res.status(404).json({ error: 'Mensagem não encontrada.' });
 
@@ -101,7 +129,13 @@ const deleteMessageController = async (req, res) => {
         logger.info('Mensagem removida (soft delete)', { id });
         return res.status(200).json({ message: 'Mensagem removida com sucesso.' });
     } catch (error) {
-        logger.error('Erro ao remover mensagem', { id, error: error.message });
+        logger.error('Erro ao remover mensagem', {
+            id,
+            error: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack,
+        });
         return res.status(500).json({ error: 'Erro ao remover mensagem.' });
     }
 };
@@ -122,6 +156,7 @@ const addTargetController = async (req, res) => {
     }
 
     try {
+        logger.info('Adicionando target à mensagem', { id, targeting_type, targeting_value });
         const existing = await getMessageById(id);
         if (!existing) return res.status(404).json({ error: 'Mensagem não encontrada.' });
 
@@ -129,7 +164,13 @@ const addTargetController = async (req, res) => {
         logger.info('Target adicionado à mensagem', { messageId: id, targeting_type, targeting_value });
         return res.status(201).json(target);
     } catch (error) {
-        logger.error('Erro ao adicionar target', { id, error: error.message });
+        logger.error('Erro ao adicionar target', {
+            id,
+            error: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack,
+        });
         return res.status(500).json({ error: 'Erro ao adicionar target.' });
     }
 };
@@ -138,6 +179,7 @@ const removeTargetController = async (req, res) => {
     const { targetId } = req.params;
 
     try {
+        logger.info('Removendo target', { targetId });
         await removeTarget(targetId);
         logger.info('Target removido', { targetId });
         return res.status(200).json({ message: 'Target removido com sucesso.' });
@@ -145,7 +187,13 @@ const removeTargetController = async (req, res) => {
         if (error.code === 'P2025') {
             return res.status(404).json({ error: 'Target não encontrado.' });
         }
-        logger.error('Erro ao remover target', { targetId, error: error.message });
+        logger.error('Erro ao remover target', {
+            targetId,
+            error: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack,
+        });
         return res.status(500).json({ error: 'Erro ao remover target.' });
     }
 };
@@ -220,7 +268,14 @@ const assignByAddressController = async (req, res) => {
         logger.info('Mensagem atribuída', { messageId: id, filter_type, assigned, failed });
         return res.status(200).json({ assigned, failed });
     } catch (error) {
-        logger.error('Erro em assignByAddressController', { id, filter_type, error: error.message });
+        logger.error('Erro em assignByAddressController', {
+            id,
+            filter_type,
+            error: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack,
+        });
         return res.status(500).json({ error: 'Erro ao atribuir mensagem.' });
     }
 };

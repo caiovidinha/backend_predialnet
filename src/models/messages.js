@@ -160,7 +160,14 @@ const findMessageForClient = async ({ cpf, cidade, bairro, rua, cep, numero }) =
         return null;
     } catch (error) {
         // Fail silently so the calling endpoint still returns client data
-        logger.error('Erro em findMessageForClient', { cpf, cep, error: error.message });
+        logger.error('Erro em findMessageForClient', {
+            cpf,
+            cep,
+            error: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack,
+        });
         return null;
     }
 };
