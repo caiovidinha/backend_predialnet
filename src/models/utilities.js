@@ -324,7 +324,8 @@ const getClientsByAddressModel = async ({ cidade, bairro, cep, numero } = {}) =>
         });
 
         const data = response.data?.data ?? response.data;
-        return Array.isArray(data) ? data : [];
+        if (!Array.isArray(data)) return [];
+        return data.map(item => item.cliente?.inscricao).filter(Boolean);
     } catch (error) {
         logger.error('Erro ao buscar clientes por endereço', {
             cidade, bairro, cep, numero,

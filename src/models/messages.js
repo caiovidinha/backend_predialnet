@@ -93,6 +93,10 @@ const removeTarget = async (targetId) => {
  * Returns the message in msg_monitoramento format, or null if none found.
  */
 const findMessageForClient = async ({ cpf, cidade, bairro, rua, cep, numero }) => {
+    // Normalize CEP: remove hyphen so "24230-050" and "24230050" both match
+    const normalizedCep = cep ? String(cep).replace('-', '') : cep;
+    cep = normalizedCep;
+
     try {
         const orConditions = [
             { targeting_type: 'CLIENTE', targeting_value: String(cpf) },
