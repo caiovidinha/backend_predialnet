@@ -104,6 +104,11 @@ const createMessageController = async (req, res) => {
                     error: `targeting_value é obrigatório para o tipo ${t.targeting_type}.`,
                 });
             }
+            if (t.targeting_type === 'BAIRRO_CIDADE' && !t.targeting_value.includes(':')) {
+                return res.status(400).json({
+                    error: 'BAIRRO_CIDADE requer targeting_value no formato "bairro:cidade". Ex: "Icaraí:NITERÓI".',
+                });
+            }
         }
     }
 
@@ -225,6 +230,11 @@ const addTargetController = async (req, res) => {
     if (targeting_type !== 'GLOBAL' && !targeting_value) {
         return res.status(400).json({
             error: 'targeting_value é obrigatório para tipos não-GLOBAL.',
+        });
+    }
+    if (targeting_type === 'BAIRRO_CIDADE' && !targeting_value.includes(':')) {
+        return res.status(400).json({
+            error: 'BAIRRO_CIDADE requer targeting_value no formato "bairro:cidade". Ex: "Icaraí:NITERÓI".',
         });
     }
 
