@@ -147,3 +147,16 @@ model AppMessageTarget {
   @@index([targeting_type, targeting_value])
   @@map("app_message_targets")
 }
+
+model ClientAddress {
+  id         String   @id @default(uuid())
+  cpf        String   @unique
+  cidade     String?
+  bairro     String?
+  cep        String?
+  numero     String?
+  updated_at DateTime @updatedAt
+
+  @@index([cep])
+  @@map("client_addresses")
+}

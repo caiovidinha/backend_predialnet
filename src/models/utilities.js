@@ -276,15 +276,19 @@ const getAlertMessageModel = async (codcliente) => {
         const clienteData = await getUserByIDModel(codcliente);
         const externalMsg = clienteData?.cliente?.msg_monitoramento || null;
 
-        // Our DB message takes priority over the external API message
         const cpf = clienteData?.cliente?.inscricao || null;
         const cidade = clienteData?.cliente?.cidade || null;
         const bairro = clienteData?.cliente?.bairro || null;
-        const rua = clienteData?.cliente?.logradouro || null;
-        const cep = clienteData?.cliente?.cep || null;
+        const cep = clienteData?.cliente?.cep ? String(clienteData.cliente.cep).replace('-', '') : null;
         const numero = clienteData?.cliente?.numero || null;
-        const ourMsg = await findMessageForClient({ cpf, cidade, bairro, rua, cep, numero });
 
+        // Lazily populate ClientAddress with the most up-to-date address from UAIPI
+        if (cpf) {
+            upsertClientAddresses([cpf], { cidade, bairro, cep, numero })
+                .catch(err => logger.warn('Falha ao popular ClientAddress (lazy)', { cpf, error: err.message }));
+        }
+
+        const ourMsg = await findMessageForClient({ cpf });
         return ourMsg || externalMsg;
     } catch (error) {
         logger.error("Erro em getAlertMessageModel", {
@@ -301,6 +305,33 @@ const getAlertMessageModel = async (codcliente) => {
 const getAllUserCpfsModel = async () => {
     const users = await client.user.findMany({ select: { cpf: true } });
     return users.map(u => u.cpf);
+};
+
+const UPSERT_BATCH_SIZE = 500;
+
+/**
+ * Upserts address fields for a list of CPFs.
+ * Only the fields provided are written; existing fields in other columns are preserved.
+ */
+const upsertClientAddresses = async (cpfs, addressFields) => {
+    const fields = Object.fromEntries(
+        Object.entries(addressFields).filter(([, v]) => v != null && v !== '')
+    );
+    if (!Object.keys(fields).length || !cpfs.length) return;
+
+    for (let i = 0; i < cpfs.length; i += UPSERT_BATCH_SIZE) {
+        const batch = cpfs.slice(i, i + UPSERT_BATCH_SIZE).map(String);
+        // Update existing records — only touches the columns in `fields`
+        await client.clientAddress.updateMany({
+            where: { cpf: { in: batch } },
+            data: fields,
+        });
+        // Insert records that don't exist yet
+        await client.clientAddress.createMany({
+            data: batch.map(cpf => ({ cpf, ...fields })),
+            skipDuplicates: true,
+        });
+    }
 };
 
 /**
@@ -324,15 +355,9 @@ const getClientsByAddressModel = async ({ cidade, bairro, cep, numero } = {}) =>
         });
 
         const data = response.data?.data ?? response.data;
-        logger.info('Resposta bruta by-address', {
-            params,
-            statusCode: response.status,
-            isArray: Array.isArray(data),
-            length: Array.isArray(data) ? data.length : null,
-            sample: Array.isArray(data) ? data[0] : data,
-        });
         if (!Array.isArray(data)) return [];
-        return data.map(item => item.cliente?.inscricao).filter(Boolean);
+        // by-address returns plain CPF strings
+        return data.map(item => (typeof item === 'object' ? item.cliente?.inscricao : item)).filter(Boolean);
     } catch (error) {
         logger.error('Erro ao buscar clientes por endereço', {
             cidade, bairro, cep, numero,
@@ -356,4 +381,5 @@ module.exports = {
     getAlertMessageModel,
     getAllUserCpfsModel,
     getClientsByAddressModel,
+    upsertClientAddresses,
 };

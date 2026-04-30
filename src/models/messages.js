@@ -94,31 +94,76 @@ const removeTarget = async (targetId) => {
  */
 const findMessageForClient = async ({ cpf }) => {
     try {
-        // All targets now store CPF as targeting_value (resolved at creation time).
-        // GLOBAL targets use targeting_type = 'GLOBAL' with value '*'.
-        const message = await client.appMessage.findFirst({
+        // Look up the client's known address in our local table
+        const addr = await client.clientAddress.findUnique({ where: { cpf: String(cpf) } });
+
+        const orConditions = [
+            { targeting_type: 'GLOBAL' },
+            { targeting_type: 'CLIENTE', targeting_value: String(cpf) },
+        ];
+        if (addr?.cidade) orConditions.push({ targeting_type: 'CIDADE', targeting_value: addr.cidade });
+        if (addr?.bairro) orConditions.push({ targeting_type: 'BAIRRO', targeting_value: addr.bairro });
+        if (addr?.cep) {
+            orConditions.push({ targeting_type: 'CEP', targeting_value: addr.cep });
+            orConditions.push({ targeting_type: 'RUA', targeting_value: addr.cep });
+        }
+        if (addr?.cep && addr?.numero) {
+            orConditions.push({ targeting_type: 'CEP_NUMERO', targeting_value: `${addr.cep}:${addr.numero}` });
+        }
+
+        const messages = await client.appMessage.findMany({
             where: {
                 active: true,
                 deleted_at: null,
-                targets: {
-                    some: {
-                        OR: [
-                            { targeting_value: String(cpf) },
-                            { targeting_type: 'GLOBAL' },
-                        ],
-                    },
-                },
+                targets: { some: { OR: orConditions } },
             },
-            orderBy: { created_at: 'desc' },
+            include: { targets: true },
         });
 
-        if (!message) return null;
+        if (messages.length === 0) return null;
 
-        return {
-            id: message.id,
-            msg_cliente: message.msg_cliente,
-            timeout_sec: message.timeout_sec,
-        };
+        // Return the most specific match according to priority order
+        for (const type of PRIORITY_ORDER) {
+            let match = null;
+            if (type === 'CLIENTE') {
+                match = messages.find(m =>
+                    m.targets.some(t => t.targeting_type === 'CLIENTE' && t.targeting_value === String(cpf))
+                );
+            } else if (type === 'CEP_NUMERO' && addr?.cep && addr?.numero) {
+                match = messages.find(m =>
+                    m.targets.some(t => t.targeting_type === 'CEP_NUMERO' && t.targeting_value === `${addr.cep}:${addr.numero}`)
+                );
+            } else if (type === 'CEP' && addr?.cep) {
+                match = messages.find(m =>
+                    m.targets.some(t => t.targeting_type === 'CEP' && t.targeting_value === addr.cep)
+                );
+            } else if (type === 'RUA' && addr?.cep) {
+                match = messages.find(m =>
+                    m.targets.some(t => t.targeting_type === 'RUA' && t.targeting_value === addr.cep)
+                );
+            } else if (type === 'BAIRRO' && addr?.bairro) {
+                match = messages.find(m =>
+                    m.targets.some(t => t.targeting_type === 'BAIRRO' && t.targeting_value === addr.bairro)
+                );
+            } else if (type === 'CIDADE' && addr?.cidade) {
+                match = messages.find(m =>
+                    m.targets.some(t => t.targeting_type === 'CIDADE' && t.targeting_value === addr.cidade)
+                );
+            } else if (type === 'GLOBAL') {
+                match = messages.find(m =>
+                    m.targets.some(t => t.targeting_type === 'GLOBAL')
+                );
+            }
+            if (match) {
+                return {
+                    id: match.id,
+                    msg_cliente: match.msg_cliente,
+                    timeout_sec: match.timeout_sec,
+                };
+            }
+        }
+
+        return null;
     } catch (error) {
         // Fail silently so the calling endpoint still returns client data
         logger.error('Erro em findMessageForClient', {

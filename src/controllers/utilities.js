@@ -2,7 +2,7 @@
 
 const logger = require("../utils/logger");
 const { manageShowAd } = require("../models/utilities");
-const { updateSerAdicionalModel, updateControleParentalModel, getUserByIDModel, getClientStatusModel, getAlertMessageModel } = require("../models/utilities");
+const { updateSerAdicionalModel, updateControleParentalModel, getUserByIDModel, getClientStatusModel, getAlertMessageModel, upsertClientAddresses } = require("../models/utilities");
 const { findMessageForClient } = require("../models/messages");
 
 /**
@@ -79,10 +79,16 @@ const getUserByID = async (req, res) => {
             const cpf = response?.cliente?.inscricao || null;
             const cidade = response?.cliente?.cidade || null;
             const bairro = response?.cliente?.bairro || null;
-            const rua = response?.cliente?.logradouro || null;
-            const cep = response?.cliente?.cep || null;
+            const cep = response?.cliente?.cep ? String(response.cliente.cep).replace('-', '') : null;
             const numero = response?.cliente?.numero || null;
-            const ourMessage = await findMessageForClient({ cpf, cidade, bairro, rua, cep, numero });
+
+            // Lazily populate ClientAddress with the most up-to-date address from UAIPI
+            if (cpf) {
+                upsertClientAddresses([cpf], { cidade, bairro, cep, numero })
+                    .catch(err => logger.warn("Falha ao popular ClientAddress (lazy)", { cpf, error: err.message }));
+            }
+
+            const ourMessage = await findMessageForClient({ cpf });
             if (ourMessage) {
                 response.cliente = {
                     ...response.cliente,

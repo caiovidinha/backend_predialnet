@@ -9,12 +9,27 @@ const {
     addTarget,
     removeTarget,
 } = require('../models/messages');
-const { getClientsByAddressModel, getAllUserCpfsModel } = require('../models/utilities');
+const { getClientsByAddressModel, getAllUserCpfsModel, upsertClientAddresses } = require('../models/utilities');
 
 /**
  * Converts a targeting_value to the params expected by getClientsByAddressModel.
  */
 const parseTargetToParams = ({ targeting_type, targeting_value }) => {
+    if (targeting_type === 'CIDADE') return { cidade: targeting_value };
+    if (targeting_type === 'BAIRRO') return { bairro: targeting_value };
+    if (targeting_type === 'RUA')    return { cep: targeting_value };
+    if (targeting_type === 'CEP')    return { cep: targeting_value };
+    if (targeting_type === 'CEP_NUMERO') {
+        const [cep, numero] = targeting_value.split(':');
+        return { cep, numero };
+    }
+    return {};
+};
+
+/**
+ * Extracts the address fields that a target represents, used to populate ClientAddress.
+ */
+const buildAddressFields = ({ targeting_type, targeting_value }) => {
     if (targeting_type === 'CIDADE') return { cidade: targeting_value };
     if (targeting_type === 'BAIRRO') return { bairro: targeting_value };
     if (targeting_type === 'RUA')    return { cep: targeting_value };
@@ -40,10 +55,14 @@ const resolveTargets = async (targets) => {
         }
         const params = parseTargetToParams(t);
         const cpfs = await getClientsByAddressModel(params);
-        logger.info('Targets resolvidos via UAIPI', { targeting_type: t.targeting_type, targeting_value: t.targeting_value, cpfsFound: cpfs.length });
-        for (const cpf of cpfs) {
-            resolved.push({ targeting_type: t.targeting_type, targeting_value: String(cpf) });
-        }
+        logger.info('CPFs resolvidos para população de ClientAddress', {
+            targeting_type: t.targeting_type,
+            targeting_value: t.targeting_value,
+            cpfsFound: cpfs.length,
+        });
+        await upsertClientAddresses(cpfs, buildAddressFields(t));
+        // Keep the original address-based target (not expanded to individual CPFs)
+        resolved.push(t);
     }
     return resolved;
 };
@@ -205,22 +224,19 @@ const addTargetController = async (req, res) => {
             return res.status(201).json(target);
         }
 
-        // Address-based: resolve to CPFs via UAIPI
+        // Address-based: populate ClientAddress via UAIPI, then add ONE address-based target
         const params = parseTargetToParams({ targeting_type, targeting_value });
         const cpfs = await getClientsByAddressModel(params);
         logger.info('CPFs resolvidos para addTarget', { id, targeting_type, targeting_value, cpfsFound: cpfs.length });
 
         if (cpfs.length === 0) {
-            return res.status(200).json({ added: 0, message: 'Nenhum cliente encontrado para esse endereço.' });
+            return res.status(200).json({ populated: 0, message: 'Nenhum cliente encontrado para esse endereço.' });
         }
 
-        const results = await Promise.allSettled(
-            cpfs.map(cpf => addTarget(id, { targeting_type, targeting_value: String(cpf) }))
-        );
-        const added = results.filter(r => r.status === 'fulfilled').length;
-        const failed = results.filter(r => r.status === 'rejected').length;
-        logger.info('Targets adicionados à mensagem', { messageId: id, targeting_type, added, failed });
-        return res.status(201).json({ added, failed });
+        await upsertClientAddresses(cpfs, buildAddressFields({ targeting_type, targeting_value }));
+        const target = await addTarget(id, { targeting_type, targeting_value });
+        logger.info('Target adicionado à mensagem', { messageId: id, targeting_type, targeting_value, clientsPopulated: cpfs.length });
+        return res.status(201).json({ target, clientsPopulated: cpfs.length });
     } catch (error) {
         logger.error('Erro ao adicionar target', {
             id,
