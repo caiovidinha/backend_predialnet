@@ -4,7 +4,7 @@ const messagesController = require('../controllers/messagesController');
 
 const messagesRouter = express.Router();
 
-// messagesRouter.use(validateJWT);
+messagesRouter.use(validateJWT);
 
 /**
  * @swagger
