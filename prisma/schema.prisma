@@ -116,7 +116,7 @@ enum TargetingType {
   GLOBAL
   CLIENTE
   CIDADE
-  BAIRRO
+  BAIRRO_CIDADE
   RUA
   CEP
   CEP_NUMERO

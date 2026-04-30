@@ -1,9 +1,9 @@
 const { client } = require('../prisma/client');
 const logger = require('../utils/logger');
 
-const VALID_TARGETING_TYPES = ['GLOBAL', 'CLIENTE', 'CIDADE', 'BAIRRO', 'RUA', 'CEP', 'CEP_NUMERO'];
+const VALID_TARGETING_TYPES = ['GLOBAL', 'CLIENTE', 'CIDADE', 'BAIRRO_CIDADE', 'RUA', 'CEP', 'CEP_NUMERO'];
 // Resolution priority: more specific wins over more generic
-const PRIORITY_ORDER = ['CLIENTE', 'CEP_NUMERO', 'CEP', 'RUA', 'BAIRRO', 'CIDADE', 'GLOBAL'];
+const PRIORITY_ORDER = ['CLIENTE', 'CEP_NUMERO', 'CEP', 'RUA', 'BAIRRO_CIDADE', 'CIDADE', 'GLOBAL'];
 
 const createMessage = async ({ title, msg_cliente, timeout_sec = 10, targets = [] }) => {
     return client.appMessage.create({
@@ -102,7 +102,8 @@ const findMessageForClient = async ({ cpf }) => {
             { targeting_type: 'CLIENTE', targeting_value: String(cpf) },
         ];
         if (addr?.cidade) orConditions.push({ targeting_type: 'CIDADE', targeting_value: addr.cidade });
-        if (addr?.bairro) orConditions.push({ targeting_type: 'BAIRRO', targeting_value: addr.bairro });
+        // BAIRRO_CIDADE: targeting_value is "bairro:cidade" — both must match
+        if (addr?.bairro && addr?.cidade) orConditions.push({ targeting_type: 'BAIRRO_CIDADE', targeting_value: `${addr.bairro}:${addr.cidade}` });
         if (addr?.cep) {
             orConditions.push({ targeting_type: 'CEP', targeting_value: addr.cep });
             orConditions.push({ targeting_type: 'RUA', targeting_value: addr.cep });
@@ -141,9 +142,9 @@ const findMessageForClient = async ({ cpf }) => {
                 match = messages.find(m =>
                     m.targets.some(t => t.targeting_type === 'RUA' && t.targeting_value === addr.cep)
                 );
-            } else if (type === 'BAIRRO' && addr?.bairro) {
+            } else if (type === 'BAIRRO_CIDADE' && addr?.bairro && addr?.cidade) {
                 match = messages.find(m =>
-                    m.targets.some(t => t.targeting_type === 'BAIRRO' && t.targeting_value === addr.bairro)
+                    m.targets.some(t => t.targeting_type === 'BAIRRO_CIDADE' && t.targeting_value === `${addr.bairro}:${addr.cidade}`)
                 );
             } else if (type === 'CIDADE' && addr?.cidade) {
                 match = messages.find(m =>

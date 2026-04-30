@@ -16,7 +16,10 @@ const { getClientsByAddressModel, getAllUserCpfsModel, upsertClientAddresses } =
  */
 const parseTargetToParams = ({ targeting_type, targeting_value }) => {
     if (targeting_type === 'CIDADE') return { cidade: targeting_value };
-    if (targeting_type === 'BAIRRO') return { bairro: targeting_value };
+    if (targeting_type === 'BAIRRO_CIDADE') {
+        const [bairro, cidade] = targeting_value.split(':');
+        return { bairro, cidade };
+    }
     if (targeting_type === 'RUA')    return { cep: targeting_value };
     if (targeting_type === 'CEP')    return { cep: targeting_value };
     if (targeting_type === 'CEP_NUMERO') {
@@ -31,7 +34,10 @@ const parseTargetToParams = ({ targeting_type, targeting_value }) => {
  */
 const buildAddressFields = ({ targeting_type, targeting_value }) => {
     if (targeting_type === 'CIDADE') return { cidade: targeting_value };
-    if (targeting_type === 'BAIRRO') return { bairro: targeting_value };
+    if (targeting_type === 'BAIRRO_CIDADE') {
+        const [bairro, cidade] = targeting_value.split(':');
+        return { bairro, cidade };
+    }
     if (targeting_type === 'RUA')    return { cep: targeting_value };
     if (targeting_type === 'CEP')    return { cep: targeting_value };
     if (targeting_type === 'CEP_NUMERO') {
