@@ -53,16 +53,25 @@ const resolveTargets = async (targets) => {
             resolved.push(t);
             continue;
         }
-        const params = parseTargetToParams(t);
-        const cpfs = await getClientsByAddressModel(params);
-        logger.info('CPFs resolvidos para população de ClientAddress', {
-            targeting_type: t.targeting_type,
-            targeting_value: t.targeting_value,
-            cpfsFound: cpfs.length,
-        });
-        await upsertClientAddresses(cpfs, buildAddressFields(t));
-        // Keep the original address-based target (not expanded to individual CPFs)
+        // Keep the original address-based target immediately
         resolved.push(t);
+        // Populate ClientAddress in background — don't block the response
+        const params = parseTargetToParams(t);
+        const addressFields = buildAddressFields(t);
+        getClientsByAddressModel(params)
+            .then(cpfs => {
+                logger.info('CPFs resolvidos para população de ClientAddress (background)', {
+                    targeting_type: t.targeting_type,
+                    targeting_value: t.targeting_value,
+                    cpfsFound: cpfs.length,
+                });
+                return upsertClientAddresses(cpfs, addressFields);
+            })
+            .catch(err => logger.error('Erro ao popular ClientAddress (background)', {
+                targeting_type: t.targeting_type,
+                targeting_value: t.targeting_value,
+                error: err.message,
+            }));
     }
     return resolved;
 };
@@ -224,19 +233,21 @@ const addTargetController = async (req, res) => {
             return res.status(201).json(target);
         }
 
-        // Address-based: populate ClientAddress via UAIPI, then add ONE address-based target
+        // Address-based: populate ClientAddress in background, save target immediately
+        const addrFields = buildAddressFields({ targeting_type, targeting_value });
         const params = parseTargetToParams({ targeting_type, targeting_value });
-        const cpfs = await getClientsByAddressModel(params);
-        logger.info('CPFs resolvidos para addTarget', { id, targeting_type, targeting_value, cpfsFound: cpfs.length });
+        getClientsByAddressModel(params)
+            .then(cpfs => {
+                logger.info('CPFs resolvidos para ClientAddress (background)', { id, targeting_type, targeting_value, cpfsFound: cpfs.length });
+                return upsertClientAddresses(cpfs, addrFields);
+            })
+            .catch(err => logger.error('Erro ao popular ClientAddress (background)', {
+                id, targeting_type, targeting_value, error: err.message,
+            }));
 
-        if (cpfs.length === 0) {
-            return res.status(200).json({ populated: 0, message: 'Nenhum cliente encontrado para esse endereço.' });
-        }
-
-        await upsertClientAddresses(cpfs, buildAddressFields({ targeting_type, targeting_value }));
         const target = await addTarget(id, { targeting_type, targeting_value });
-        logger.info('Target adicionado à mensagem', { messageId: id, targeting_type, targeting_value, clientsPopulated: cpfs.length });
-        return res.status(201).json({ target, clientsPopulated: cpfs.length });
+        logger.info('Target adicionado à mensagem (population em background)', { messageId: id, targeting_type, targeting_value });
+        return res.status(201).json({ target, message: 'Target salvo. Population de ClientAddress em andamento em background.' });
     } catch (error) {
         logger.error('Erro ao adicionar target', {
             id,
