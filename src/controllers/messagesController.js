@@ -11,6 +11,43 @@ const {
 } = require('../models/messages');
 const { getClientsByAddressModel, getAllUserCpfsModel } = require('../models/utilities');
 
+/**
+ * Converts a targeting_value to the params expected by getClientsByAddressModel.
+ */
+const parseTargetToParams = ({ targeting_type, targeting_value }) => {
+    if (targeting_type === 'CIDADE') return { cidade: targeting_value };
+    if (targeting_type === 'BAIRRO') return { bairro: targeting_value };
+    if (targeting_type === 'RUA')    return { cep: targeting_value };
+    if (targeting_type === 'CEP')    return { cep: targeting_value };
+    if (targeting_type === 'CEP_NUMERO') {
+        const [cep, numero] = targeting_value.split(':');
+        return { cep, numero };
+    }
+    return {};
+};
+
+/**
+ * Resolves address-based targets to CPF targets via UAIPI.
+ * CLIENTE and GLOBAL targets are kept as-is.
+ * Returns a flat array of { targeting_type, targeting_value } where targeting_value is always a CPF (or '*' for GLOBAL).
+ */
+const resolveTargets = async (targets) => {
+    const resolved = [];
+    for (const t of targets) {
+        if (t.targeting_type === 'GLOBAL' || t.targeting_type === 'CLIENTE') {
+            resolved.push(t);
+            continue;
+        }
+        const params = parseTargetToParams(t);
+        const cpfs = await getClientsByAddressModel(params);
+        logger.info('Targets resolvidos via UAIPI', { targeting_type: t.targeting_type, targeting_value: t.targeting_value, cpfsFound: cpfs.length });
+        for (const cpf of cpfs) {
+            resolved.push({ targeting_type: t.targeting_type, targeting_value: String(cpf) });
+        }
+    }
+    return resolved;
+};
+
 const createMessageController = async (req, res) => {
     const { title, msg_cliente, timeout_sec, targets } = req.body;
 
@@ -38,7 +75,9 @@ const createMessageController = async (req, res) => {
 
     try {
         logger.info('Criando mensagem', { title, timeout_sec, targetsCount: targets?.length ?? 0 });
-        const message = await createMessage({ title, msg_cliente, timeout_sec, targets });
+        const resolvedTargets = targets ? await resolveTargets(targets) : [];
+        logger.info('Targets resolvidos para criação', { original: targets?.length ?? 0, resolved: resolvedTargets.length });
+        const message = await createMessage({ title, msg_cliente, timeout_sec, targets: resolvedTargets });
         logger.info('Mensagem de aviso criada', { id: message.id, title });
         return res.status(201).json(message);
     } catch (error) {
@@ -160,9 +199,28 @@ const addTargetController = async (req, res) => {
         const existing = await getMessageById(id);
         if (!existing) return res.status(404).json({ error: 'Mensagem não encontrada.' });
 
-        const target = await addTarget(id, { targeting_type, targeting_value: targeting_value ?? '*' });
-        logger.info('Target adicionado à mensagem', { messageId: id, targeting_type, targeting_value });
-        return res.status(201).json(target);
+        if (targeting_type === 'GLOBAL' || targeting_type === 'CLIENTE') {
+            const target = await addTarget(id, { targeting_type, targeting_value: targeting_value ?? '*' });
+            logger.info('Target adicionado à mensagem', { messageId: id, targeting_type, targeting_value });
+            return res.status(201).json(target);
+        }
+
+        // Address-based: resolve to CPFs via UAIPI
+        const params = parseTargetToParams({ targeting_type, targeting_value });
+        const cpfs = await getClientsByAddressModel(params);
+        logger.info('CPFs resolvidos para addTarget', { id, targeting_type, targeting_value, cpfsFound: cpfs.length });
+
+        if (cpfs.length === 0) {
+            return res.status(200).json({ added: 0, message: 'Nenhum cliente encontrado para esse endereço.' });
+        }
+
+        const results = await Promise.allSettled(
+            cpfs.map(cpf => addTarget(id, { targeting_type, targeting_value: String(cpf) }))
+        );
+        const added = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        logger.info('Targets adicionados à mensagem', { messageId: id, targeting_type, added, failed });
+        return res.status(201).json({ added, failed });
     } catch (error) {
         logger.error('Erro ao adicionar target', {
             id,
