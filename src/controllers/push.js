@@ -11,6 +11,71 @@ const pushQueue = require("../queues/pushQueue");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const logger = require("../utils/logger");
+const { getClientsByAddressModel, getAllUserCpfsModel } = require("../models/utilities");
+
+const VALID_PUSH_TARGETING_TYPES = ['GLOBAL', 'CLIENTE', 'CIDADE', 'BAIRRO_CIDADE', 'RUA', 'CEP', 'CEP_NUMERO'];
+const VALID_PUSH_FILTER_TYPES = ['GERAL', 'CPF', 'CIDADE', 'BAIRRO', 'RUA', 'CEP', 'CEP_NUMERO'];
+
+/**
+ * Resolves a targets[] array (same structure as messages) to a deduplicated array of CPF strings.
+ */
+const resolveTargetsToCpfs = async (targets) => {
+  const cpfSet = new Set();
+  for (const t of targets) {
+    if (t.targeting_type === 'GLOBAL') {
+      const cpfs = await getAllUserCpfsModel();
+      cpfs.forEach(c => cpfSet.add(String(c)));
+    } else if (t.targeting_type === 'CLIENTE') {
+      cpfSet.add(String(t.targeting_value));
+    } else if (t.targeting_type === 'CIDADE') {
+      const cpfs = await getClientsByAddressModel({ cidade: t.targeting_value });
+      cpfs.forEach(c => cpfSet.add(String(c)));
+    } else if (t.targeting_type === 'BAIRRO_CIDADE') {
+      const [bairro, cidade] = t.targeting_value.split(':');
+      const cpfs = await getClientsByAddressModel({ bairro, cidade });
+      cpfs.forEach(c => cpfSet.add(String(c)));
+    } else if (t.targeting_type === 'RUA' || t.targeting_type === 'CEP') {
+      const cpfs = await getClientsByAddressModel({ cep: t.targeting_value });
+      cpfs.forEach(c => cpfSet.add(String(c)));
+    } else if (t.targeting_type === 'CEP_NUMERO') {
+      const [cep, numero] = t.targeting_value.split(':');
+      const cpfs = await getClientsByAddressModel({ cep, numero });
+      cpfs.forEach(c => cpfSet.add(String(c)));
+    }
+  }
+  return Array.from(cpfSet);
+};
+
+/**
+ * Shared helper: given a list of CPF strings, fetches tokens, creates Notification/UserNotification
+ * records and enqueues the push messages.
+ * Returns { queued, notificationId } or throws.
+ */
+const enqueuePushForCpfs = async ({ cpfs, title, body, data }) => {
+  const users = await prisma.user.findMany({
+    where: { cpf: { in: cpfs.map(String) } },
+    select: { id: true },
+  });
+  const userIds = users.map(u => u.id);
+  if (userIds.length === 0) return { queued: 0, notificationId: null };
+
+  const tokens = await getTokensByUserIds(userIds);
+  if (tokens.length === 0) return { queued: 0, notificationId: null };
+
+  const note = await createNotification({ title, body, data });
+  await createUserNotifications(userIds, note.id);
+
+  const messages = tokens.map(({ token }) => ({
+    to: token,
+    title,
+    body,
+    sound: "default",
+    data,
+  }));
+  await pushQueue.add({ messages, notificationId: note.id }, { attempts: 3, backoff: 5000 });
+
+  return { queued: messages.length, notificationId: note.id };
+};
 
 
 /**
@@ -306,11 +371,138 @@ async function markReadController(req, res) {
 }
 
 
+/**
+ * POST /push/send-targeted
+ * Sends push notifications to users resolved from a targets[] array.
+ * Uses the same targeting_type / targeting_value structure as the messages system.
+ * Requires JWT authentication.
+ */
+async function sendTargetedController(req, res) {
+  const { title, body, data, targets } = req.body;
+
+  if (!title || !body) {
+    return res.status(400).json({ error: "Os campos title e body são obrigatórios." });
+  }
+  if (!Array.isArray(targets) || targets.length === 0) {
+    return res.status(400).json({ error: "targets deve ser um array não-vazio." });
+  }
+
+  for (const t of targets) {
+    if (!t.targeting_type || !VALID_PUSH_TARGETING_TYPES.includes(t.targeting_type)) {
+      return res.status(400).json({
+        error: `targeting_type inválido. Valores aceitos: ${VALID_PUSH_TARGETING_TYPES.join(", ")}.`,
+      });
+    }
+    if (t.targeting_type !== "GLOBAL" && !t.targeting_value) {
+      return res.status(400).json({
+        error: `targeting_value é obrigatório para o tipo ${t.targeting_type}.`,
+      });
+    }
+    if (t.targeting_type === "BAIRRO_CIDADE" && !t.targeting_value.includes(":")) {
+      return res.status(400).json({
+        error: 'BAIRRO_CIDADE requer targeting_value no formato "bairro:cidade". Ex: "Icaraí:NITERÓI".',
+      });
+    }
+    if (t.targeting_type === "CEP_NUMERO" && !t.targeting_value.includes(":")) {
+      return res.status(400).json({
+        error: 'CEP_NUMERO requer targeting_value no formato "cep:numero". Ex: "24220-230:100".',
+      });
+    }
+  }
+
+  try {
+    logger.info("Resolvendo targets para push direcionado", { targetsCount: targets.length });
+    const cpfs = await resolveTargetsToCpfs(targets);
+    logger.info("CPFs resolvidos para push direcionado", { cpfsCount: cpfs.length });
+
+    if (cpfs.length === 0) {
+      return res.status(200).json({ success: true, queued: 0, message: "Nenhum cliente encontrado para os targets informados." });
+    }
+
+    const { queued, notificationId } = await enqueuePushForCpfs({ cpfs, title, body, data });
+    if (queued === 0) {
+      return res.status(200).json({ success: true, queued: 0, message: "Nenhum token de push encontrado para os usuários resolvidos." });
+    }
+
+    logger.info("Push direcionado enfileirado", { notificationId, queued });
+    return res.status(202).json({ success: true, queued, notificationId });
+  } catch (err) {
+    logger.error("Erro ao enfileirar push direcionado:", err);
+    return res.status(500).json({ error: "Erro ao enfileirar notificações." });
+  }
+}
+
+/**
+ * POST /push/send-by-address
+ * Sends push notifications to users filtered by address using filter_type.
+ * Uses the same filter_type / address-field structure as /messages/{id}/assign-by-address.
+ * Requires JWT authentication.
+ */
+async function sendByAddressController(req, res) {
+  const { title, body, data, filter_type, cpfs, cidade, bairro, cep, numero } = req.body;
+
+  if (!title || !body) {
+    return res.status(400).json({ error: "Os campos title e body são obrigatórios." });
+  }
+  if (!filter_type || !VALID_PUSH_FILTER_TYPES.includes(filter_type)) {
+    return res.status(400).json({
+      error: `filter_type inválido. Valores aceitos: ${VALID_PUSH_FILTER_TYPES.join(", ")}.`,
+    });
+  }
+
+  if (filter_type === "CPF" && (!Array.isArray(cpfs) || cpfs.length === 0))
+    return res.status(400).json({ error: "cpfs deve ser um array não-vazio para filter_type CPF." });
+  if (filter_type === "CIDADE" && !cidade)
+    return res.status(400).json({ error: "cidade é obrigatório para filter_type CIDADE." });
+  if (filter_type === "BAIRRO" && !bairro)
+    return res.status(400).json({ error: "bairro é obrigatório para filter_type BAIRRO." });
+  if ((filter_type === "CEP" || filter_type === "RUA") && !cep)
+    return res.status(400).json({ error: "cep é obrigatório para filter_type CEP/RUA." });
+  if (filter_type === "CEP_NUMERO" && (!cep || !numero))
+    return res.status(400).json({ error: "cep e numero são obrigatórios para filter_type CEP_NUMERO." });
+
+  try {
+    let targetCpfs;
+
+    if (filter_type === "GERAL") {
+      targetCpfs = await getAllUserCpfsModel();
+    } else if (filter_type === "CPF") {
+      targetCpfs = cpfs.map(String);
+    } else {
+      const params = {};
+      if (filter_type === "CIDADE") params.cidade = cidade;
+      else if (filter_type === "BAIRRO") { params.bairro = bairro; if (cidade) params.cidade = cidade; }
+      else if (filter_type === "CEP" || filter_type === "RUA") params.cep = cep;
+      else if (filter_type === "CEP_NUMERO") { params.cep = cep; params.numero = numero; }
+      targetCpfs = await getClientsByAddressModel(params);
+    }
+
+    logger.info("CPFs resolvidos para push por endereço", { filter_type, cpfsCount: targetCpfs.length });
+
+    if (targetCpfs.length === 0) {
+      return res.status(200).json({ success: true, queued: 0, message: "Nenhum cliente encontrado para o filtro informado." });
+    }
+
+    const { queued, notificationId } = await enqueuePushForCpfs({ cpfs: targetCpfs, title, body, data });
+    if (queued === 0) {
+      return res.status(200).json({ success: true, queued: 0, message: "Nenhum token de push encontrado para os usuários resolvidos." });
+    }
+
+    logger.info("Push por endereço enfileirado", { notificationId, queued, filter_type });
+    return res.status(202).json({ success: true, queued, notificationId });
+  } catch (err) {
+    logger.error("Erro ao enfileirar push por endereço:", err);
+    return res.status(500).json({ error: "Erro ao enfileirar notificações." });
+  }
+}
+
 module.exports = {
   saveTokenController,
   sendNotificationController,
   sendFilteredNotificationsController,
   webhookController,
   getNotificationsController,
-  markReadController
+  markReadController,
+  sendTargetedController,
+  sendByAddressController,
 };

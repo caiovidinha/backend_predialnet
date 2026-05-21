@@ -12,8 +12,10 @@ const {
   sendNotificationController,
   webhookController,
   sendFilteredNotificationsController,
-  getNotificationsController,    // 👈 importar
-  markReadController             // 👈 importar
+  getNotificationsController,
+  markReadController,
+  sendTargetedController,
+  sendByAddressController,
 } = require("../controllers/push");
 
 /**
@@ -264,5 +266,160 @@ router.get("/notifications/:cpf", getNotificationsController);
  *         description: Erro interno
  */
 router.patch("/notifications/:id/read", markReadController);
+
+/**
+ * @swagger
+ * /push/send-targeted:
+ *   post:
+ *     summary: Envia push para usuários segmentados por targets (mesma estrutura que mensagens)
+ *     tags: [Push]
+ *     description: |
+ *       Resolve os targets para CPFs e envia push notifications.
+ *       `targeting_type` aceitos:
+ *       - **GLOBAL**: todos os usuários cadastrados no app
+ *       - **CLIENTE**: CPF direto (`targeting_value` = CPF)
+ *       - **CIDADE**: todos os clientes na cidade (`targeting_value` = nome da cidade)
+ *       - **BAIRRO_CIDADE**: clientes no bairro+cidade (`targeting_value` = "bairro:cidade")
+ *       - **RUA**: clientes na rua identificada pelo CEP (`targeting_value` = CEP)
+ *       - **CEP**: clientes com o CEP fornecido (`targeting_value` = CEP)
+ *       - **CEP_NUMERO**: clientes no endereço exato (`targeting_value` = "cep:numero")
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - body
+ *               - targets
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Título da notificação push
+ *               body:
+ *                 type: string
+ *                 description: Texto da notificação push
+ *               data:
+ *                 type: object
+ *                 description: Payload extra enviado junto à notificação (opcional)
+ *               targets:
+ *                 type: array
+ *                 description: Regras de segmentação
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - targeting_type
+ *                   properties:
+ *                     targeting_type:
+ *                       type: string
+ *                       enum: [GLOBAL, CLIENTE, CIDADE, BAIRRO_CIDADE, RUA, CEP, CEP_NUMERO]
+ *                     targeting_value:
+ *                       type: string
+ *                       description: Obrigatório para todos os tipos exceto GLOBAL
+ *     responses:
+ *       202:
+ *         description: Notificações enfileiradas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 queued:
+ *                   type: integer
+ *                 notificationId:
+ *                   type: string
+ *       200:
+ *         description: Nenhum destinatário encontrado (queued = 0)
+ *       400:
+ *         description: Parâmetros inválidos
+ *       401:
+ *         description: Não autenticado
+ *       500:
+ *         description: Erro interno
+ */
+router.post("/send-targeted", sendTargetedController);
+
+/**
+ * @swagger
+ * /push/send-by-address:
+ *   post:
+ *     summary: Envia push para usuários filtrados por endereço ou CPF
+ *     tags: [Push]
+ *     description: |
+ *       Escolha um `filter_type` e forneça os campos correspondentes:
+ *       - **GERAL**: todos os usuários do app (nenhum campo extra necessário)
+ *       - **CPF**: lista direta de CPFs (`cpfs[]`)
+ *       - **CIDADE**: clientes na cidade (`cidade`)
+ *       - **BAIRRO**: clientes no bairro (`bairro`; `cidade` é opcional para refinar)
+ *       - **RUA**: clientes na rua identificada pelo CEP (`cep`)
+ *       - **CEP**: clientes com o CEP fornecido (`cep`)
+ *       - **CEP_NUMERO**: clientes no endereço exato (`cep` + `numero`)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - body
+ *               - filter_type
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Título da notificação push
+ *               body:
+ *                 type: string
+ *                 description: Texto da notificação push
+ *               data:
+ *                 type: object
+ *                 description: Payload extra enviado junto à notificação (opcional)
+ *               filter_type:
+ *                 type: string
+ *                 enum: [GERAL, CPF, CIDADE, BAIRRO, RUA, CEP, CEP_NUMERO]
+ *               cpfs:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Obrigatório para filter_type CPF
+ *               cidade:
+ *                 type: string
+ *                 description: Obrigatório para filter_type CIDADE; opcional para BAIRRO
+ *               bairro:
+ *                 type: string
+ *                 description: Obrigatório para filter_type BAIRRO
+ *               cep:
+ *                 type: string
+ *                 description: Obrigatório para filter_type RUA, CEP e CEP_NUMERO
+ *               numero:
+ *                 type: string
+ *                 description: Obrigatório para filter_type CEP_NUMERO
+ *     responses:
+ *       202:
+ *         description: Notificações enfileiradas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 queued:
+ *                   type: integer
+ *                 notificationId:
+ *                   type: string
+ *       200:
+ *         description: Nenhum destinatário encontrado (queued = 0)
+ *       400:
+ *         description: Parâmetros inválidos
+ *       401:
+ *         description: Não autenticado
+ *       500:
+ *         description: Erro interno
+ */
+router.post("/send-by-address", sendByAddressController);
 
 module.exports = router;
