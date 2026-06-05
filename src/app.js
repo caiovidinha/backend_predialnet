@@ -14,6 +14,7 @@ const agendamentoRouter = require("./routes/agendamentoRouter");
 const pushRouter = require("./routes/pushRouter");
 const trelloRouter = require("./routes/trelloRouter");
 const messagesRouter = require("./routes/messagesRouter");
+const ehClienteRouter = require("./routes/ehClienteRouter");
 
 const { swaggerUi, specs } = require("./utils/swagger");
 const swaggerAuthMiddleware = require("./middlewares/authSwagger");
@@ -23,7 +24,13 @@ app.use((req, res, next) => {
         try {     decodeURIComponent(req.path);   }
         catch (err) {     return res.status(400).send("Bad Request");   }   next(); });
 
-app.use(cors());
+app.use((req, res, next) => {
+  if (req.path === "/eh-cliente") {
+    return next();
+  }
+
+  return cors()(req, res, next);
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -36,6 +43,7 @@ app.use("/agendamento", agendamentoRouter);
 app.use("/push", pushRouter);
 app.use("/trello", trelloRouter);
 app.use("/messages", messagesRouter);
+app.use("/", ehClienteRouter);
 // Proteger só a rota principal do Swagger UI
 app.get("/docs", swaggerAuthMiddleware, (req, res, next) => {
   swaggerUi.setup(specs)(req, res, next);
