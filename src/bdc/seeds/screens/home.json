@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "screen": "home",
+  "tree": {
+    "type": "Screen",
+    "children": [
+      { "type": "Header", "bindings": { "nome": "cliente.nome", "id": "cliente.id" } },
+      {
+        "type": "Section",
+        "props": { "title": "Navegue pelo app" },
+        "children": [
+          {
+            "type": "MenuList",
+            "props": {
+              "items": [
+                { "icon": "user", "label": "Perfil", "trailing": "chevron", "action": { "type": "navigate", "to": "/main/home/perfil" } },
+                { "icon": "money", "label": "Financeiro", "trailing": "chevron", "action": { "type": "navigate", "to": "/main/fatura" } },
+                { "icon": "support", "label": "Suporte", "trailing": "chevron", "action": { "type": "navigate", "to": "/main/suporte" } },
+                { "icon": "settings", "label": "Opções", "trailing": "chevron", "action": { "type": "navigate", "to": "/main/settings" } }
+              ]
+            }
+          }
+        ]
+      },
+      { "type": "SectionTitle", "props": { "text": "Ofertas para você" } },
+      {
+        "type": "Carousel",
+        "props": {
+          "items": [
+            { "image": "https://www.predialnet.com.br/download/banner600.jpg", "action": { "type": "openURL", "url": "https://www.predialnet.com.br/assineja" } },
+            { "image": "https://www.predialnet.com.br/download/banner700.jpg", "action": { "type": "openURL", "url": "https://www.predialnet.com.br/assineja" } }
+          ]
+        }
+      },
+      {
+        "type": "Button",
+        "props": { "label": "Aproveitar agora" },
+        "actions": { "onPress": { "type": "openBrowser", "url": "https://www.predialnet.com.br/assineja" } }
+      }
+    ]
+  }
+}

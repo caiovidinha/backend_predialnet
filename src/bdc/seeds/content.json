@@ -1,0 +1,25 @@
+{
+  "ads": {
+    "home": {
+      "show": true,
+      "image": "https://www.predialnet.com.br/download/modal_wifi_6.jpg",
+      "version": "2025-08-08-01",
+      "action": { "type": "openURL", "url": "https://www.predialnet.com.br/assineja" }
+    }
+  },
+  "featureFlags": {
+    "faturaDigital": true,
+    "libtemp": true,
+    "planUpgrade": true
+  },
+  "support": {
+    "tel_suporte": "35150500",
+    "tel_ouvidoria": "08008787319",
+    "tel_ajuda": "35150555",
+    "speedtestUrl": "https://speedtest.predialnet.com.br/"
+  },
+  "planUpgrade": {
+    "trelloListId": "6893b5bae792d535ffdf41bb",
+    "priceMap": { "600": "R$ 99,90", "800": "R$ 124,90", "1000": "R$ 139,90" }
+  }
+}

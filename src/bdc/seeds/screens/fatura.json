@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "screen": "fatura",
+  "tree": {
+    "type": "Screen",
+    "children": [
+      { "type": "Header", "bindings": { "nome": "cliente.nome", "id": "cliente.id" } },
+      { "type": "SectionTitle", "props": { "text": "Fatura atual" } },
+      { "type": "ValueBadge", "bindings": { "value": "invoice.valor", "status": "invoice.status" } },
+      {
+        "type": "Button",
+        "props": { "label": "Pagar com PIX", "icon": "pix" },
+        "visibleWhen": "invoice.status != 'Pago' && invoice.status != 'Cancelada'",
+        "actions": { "onPress": { "type": "openDialog", "dialog": "pix" } }
+      },
+      {
+        "type": "Section",
+        "props": { "title": "Opções da Fatura" },
+        "children": [
+          {
+            "type": "MenuList",
+            "props": {
+              "items": [
+                { "icon": "export", "label": "2ª via da fatura", "action": { "type": "apiCall", "call": { "name": "fatura.segundaVia", "argFrom": "invoice.boleta" } } },
+                { "icon": "unlock", "label": "Solicitar desbloqueio", "action": { "type": "openDialog", "dialog": "desbloquear" } },
+                { "icon": "copy", "label": "Histórico de faturas", "trailing": "chevron", "action": { "type": "navigate", "to": "/main/fatura/history" } }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "Dialog",
+        "props": { "name": "pix", "title": "Pagar com PIX" },
+        "children": [
+          { "type": "Text", "props": { "text": "O PIX copia-e-cola será gerado via API autenticada.", "style": "body" } },
+          { "type": "Spacer", "props": { "size": 12 } },
+          { "type": "Button", "props": { "label": "Fechar", "variant": "secondary" }, "actions": { "onPress": { "type": "dismiss" } } }
+        ]
+      },
+      {
+        "type": "Dialog",
+        "props": { "name": "desbloquear", "title": "Solicitar desbloqueio" },
+        "children": [
+          { "type": "Text", "props": { "text": "Religar o serviço bloqueado exige o pagamento da conta atrasada em até 48h.", "style": "body" } },
+          { "type": "Spacer", "props": { "size": 12 } },
+          {
+            "type": "Button",
+            "props": { "label": "Solicitar desbloqueio", "icon": "unlock" },
+            "actions": { "onPress": { "type": "apiCall", "call": { "name": "libtemp.create" }, "onSuccess": { "type": "dismiss" } } }
+          }
+        ]
+      }
+    ]
+  }
+}

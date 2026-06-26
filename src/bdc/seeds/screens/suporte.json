@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "screen": "suporte",
+  "tree": {
+    "type": "Screen",
+    "children": [
+      { "type": "Header", "bindings": { "nome": "cliente.nome", "id": "cliente.id" } },
+      {
+        "type": "Section",
+        "props": { "title": "Opções de suporte" },
+        "children": [
+          {
+            "type": "MenuList",
+            "props": {
+              "items": [
+                { "icon": "wifi", "label": "Suporte Técnico", "action": { "type": "tel", "number": "35150500" } },
+                { "icon": "phone", "label": "Ouvidoria", "action": { "type": "tel", "number": "08008787319" } },
+                { "icon": "help", "label": "Ajuda", "action": { "type": "tel", "number": "35150555" } }
+              ]
+            }
+          }
+        ]
+      },
+      { "type": "SectionTitle", "props": { "text": "Teste sua internet" } },
+      {
+        "type": "Button",
+        "props": { "label": "Faça o teste agora" },
+        "actions": { "onPress": { "type": "openBrowser", "url": "https://speedtest.predialnet.com.br/" } }
+      }
+    ]
+  }
+}

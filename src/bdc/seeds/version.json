@@ -1,0 +1,11 @@
+{
+  "updateUrl": {
+    "ios": "https://apps.apple.com/app/id000000000",
+    "android": "https://play.google.com/store/apps/details?id=com.predialnet.app"
+  },
+  "message": "Há uma nova versão obrigatória do app. Atualize para continuar.",
+  "platforms": {
+    "ios": { "minVersion": "2.0.0", "latestVersion": "2.0.7", "force": false },
+    "android": { "minVersion": "2.0.0", "latestVersion": "2.0.7", "force": false }
+  }
+}
