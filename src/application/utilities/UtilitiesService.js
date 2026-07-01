@@ -106,6 +106,24 @@ const getClientStatus = async (codcliente) => {
   };
 };
 
+const getSerAdicionais = async (codcliente) => {
+  const res = await uaipi.get(`/clientes/${codcliente}`);
+  const serpontos = res.data[0]?.cliente?.serpontos ?? [];
+  return serpontos.map(sp => ({
+    serponto_id: sp.id,
+    ser_adicionais: sp.ser_adicionais ?? [],
+  }));
+};
+
+const getControleParental = async (codcliente) => {
+  const res = await uaipi.get(`/clientes/${codcliente}`);
+  const serpontos = res.data[0]?.cliente?.serpontos ?? [];
+  return serpontos.map(sp => ({
+    serponto_id: sp.id,
+    controle_parental: sp.controle_parental ?? [],
+  }));
+};
+
 const updateSerAdicional = async (id, data) => {
   return uaipi.put(`/seradicional/${id}`, data);
 };
@@ -185,6 +203,8 @@ module.exports = {
   toggleShowAd,
   getClientData,
   getClientStatus,
+  getSerAdicionais,
+  getControleParental,
   updateSerAdicional,
   updateControleParental,
   getAlertMessage,

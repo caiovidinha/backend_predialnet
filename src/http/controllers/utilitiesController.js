@@ -58,6 +58,28 @@ const updateControleParentalController = async (req, res) => {
   }
 };
 
+const getSerAdicionalController = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await utilitiesService.getSerAdicionais(id);
+    return res.status(200).json({ serpontos: result });
+  } catch (err) {
+    logger.error('getSerAdicionais error', { id, error: err.message });
+    return res.status(500).json({ error: 'Erro ao buscar serviços adicionais.' });
+  }
+};
+
+const getControleParentalController = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await utilitiesService.getControleParental(id);
+    return res.status(200).json({ serpontos: result });
+  } catch (err) {
+    logger.error('getControleParental error', { id, error: err.message });
+    return res.status(500).json({ error: 'Erro ao buscar controle parental.' });
+  }
+};
+
 const getAlertMessageController = async (req, res) => {
   const { codcliente } = req.params;
   if (!codcliente) return res.status(400).json({ error: 'codcliente não fornecido.' });
@@ -74,6 +96,8 @@ module.exports = {
   toggleShowAd,
   getUserByID,
   getClientStatusController,
+  getSerAdicionalController,
+  getControleParentalController,
   updateSerAdicionalController,
   updateControleParentalController,
   getAlertMessageController,
