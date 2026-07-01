@@ -20,8 +20,8 @@ const options = {
     security: [{ bearerAuth: [] }],
   },
   apis: [
-    "./src/routes/*.js",      // ✅ rotas, como loginRouter.js, pushRouter.js, etc
-    "./src/controllers/*.js", // ✅ se quiser documentar os controllers diretamente
+    "./src/http/routes/*.js",
+    "./src/http/controllers/*.js",
   ],
 };
 

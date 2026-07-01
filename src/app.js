@@ -1,56 +1,59 @@
-require('dd-trace').init({
-  logInjection: true
-});
+require('dd-trace').init({ logInjection: true });
 
-const express = require("express");
-const cors = require("cors");
+const express = require('express');
+const cors = require('cors');
 
-const requestIntercepter = require("./utils/requestIntercepter");
-const loginRouter = require("./routes/loginRouter");
-const testRouter = require("./routes/testRouter");
-const faturaRouter = require("./routes/faturaRouter");
-const utilitiesRouter = require("./routes/utilitiesRouter");
-const agendamentoRouter = require("./routes/agendamentoRouter");
-const pushRouter = require("./routes/pushRouter");
-const trelloRouter = require("./routes/trelloRouter");
-const messagesRouter = require("./routes/messagesRouter");
-const ehClienteRouter = require("./routes/ehClienteRouter");
+const requestIntercepter = require('./utils/requestIntercepter');
+const { swaggerUi, specs } = require('./utils/swagger');
+const swaggerAuthMiddleware = require('./middlewares/authSwagger');
 
-const { swaggerUi, specs } = require("./utils/swagger");
-const swaggerAuthMiddleware = require("./middlewares/authSwagger");
+// ── Rotas (nova estrutura hexagonal) ─────────────────────────
+const authRouter = require('./http/routes/authRouter');
+const appRouter = require('./http/routes/appRouter');
+const faturaRouter = require('./http/routes/faturaRouter');
+const utilitiesRouter = require('./http/routes/utilitiesRouter');
+const pushRouter = require('./http/routes/pushRouter');
+const messagesRouter = require('./http/routes/messagesRouter');
+const trelloRouter = require('./http/routes/trelloRouter');
+const agendamentoRouter = require('./http/routes/agendamentoRouter');
+const ehClienteRouter = require('./http/routes/ehClienteRouter');
+const testRouter = require('./http/routes/testRouter');
 
 const app = express();
-app.use((req, res, next) => {
-        try {     decodeURIComponent(req.path);   }
-        catch (err) {     return res.status(400).send("Bad Request");   }   next(); });
 
 app.use((req, res, next) => {
-  if (req.path === "/eh-cliente") {
-    return next();
-  }
+  try { decodeURIComponent(req.path); } catch { return res.status(400).send('Bad Request'); }
+  next();
+});
 
+app.use((req, res, next) => {
+  if (req.path === '/eh-cliente') return next();
   return cors()(req, res, next);
 });
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.all('*', requestIntercepter);
 
-app.all("*", requestIntercepter);
-app.use("/", loginRouter);
-app.use("/test", testRouter);
-app.use("/fatura", faturaRouter);
-app.use("/utils", utilitiesRouter);
-app.use("/agendamento", agendamentoRouter);
-app.use("/push", pushRouter);
-app.use("/trello", trelloRouter);
-app.use("/messages", messagesRouter);
-app.use("/", ehClienteRouter);
-// Proteger só a rota principal do Swagger UI
-app.get("/docs", swaggerAuthMiddleware, (req, res, next) => {
+app.use('/', authRouter);
+app.use('/app', appRouter);
+app.use('/fatura', faturaRouter);
+app.use('/utils', utilitiesRouter);
+app.use('/push', pushRouter);
+app.use('/messages', messagesRouter);
+app.use('/trello', trelloRouter);
+app.use('/agendamento', agendamentoRouter);
+app.use('/test', testRouter);
+app.use('/', ehClienteRouter);
+
+app.get('/docs', swaggerAuthMiddleware, (req, res, next) => {
   swaggerUi.setup(specs)(req, res, next);
 });
+app.use('/docs', swaggerUi.serve);
 
-// Servir os assets normalmente (sem proteção)
-app.use("/docs", swaggerUi.serve);
-app.use((err, req, res, next) => {   if (err instanceof URIError) {     return res.status(400).send("Malformed URI");   }   next(err); });
+app.use((err, req, res, next) => {
+  if (err instanceof URIError) return res.status(400).send('Malformed URI');
+  next(err);
+});
 
 module.exports = app;
