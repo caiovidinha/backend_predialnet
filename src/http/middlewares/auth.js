@@ -1,7 +1,11 @@
 const jwt = require('jsonwebtoken');
 const userRepo = require('../../infrastructure/repositories/userRepository');
 
+const jwtEnabled = () => process.env.ENABLE_JWT === 'true';
+
 const validateJWT = (req, res, next) => {
+  if (!jwtEnabled()) return next();
+
   const token = req.headers['x-access-token'];
 
   if (process.env.ADMIN_BYPASS_TOKEN && token === process.env.ADMIN_BYPASS_TOKEN) {
