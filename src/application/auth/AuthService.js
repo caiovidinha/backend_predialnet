@@ -173,7 +173,7 @@ const forgotPassword = async ({ userCredential, insideApp }) => {
   if (!user) throw new ForbiddenError('Usuário não existe');
 
   const clientEmails = await getUsersFromUAIPI(userCredential)
-    .then(c => c?.users.map(r => r.cliente.email).filter(Boolean) ?? []);
+    .then(c => c?.users?.map(r => r.cliente.email)?.filter(Boolean) ?? []);
 
   if (!clientEmails.includes(user.email)) {
     const censoredEmails = Array.from(await censorEmailList(clientEmails));

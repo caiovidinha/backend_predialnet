@@ -47,8 +47,16 @@ async function _request(method, path, { body, params } = {}) {
       _invalidateToken();
     }
     logger.error('UAIPI request error', {
-      method, path, error: err.message, response: err.response?.data,
+      method, path, status: err.response?.status, error: err.message, response: err.response?.data,
     });
+    // Propaga a mensagem da UAIPI quando disponível para que callers possam identificar casos esperados
+    const apiMessage = err.response?.data?.message || err.response?.data?.error;
+    if (apiMessage) {
+      const wrapped = new Error(apiMessage);
+      wrapped.status = err.response.status;
+      wrapped.originalError = err;
+      throw wrapped;
+    }
     throw err;
   }
 }

@@ -62,7 +62,6 @@ const getClientStatus = async (codcliente) => {
   const clienteData = data.data[0];
   const serpontos = clienteData.cliente.serpontos || [];
 
-  const token = await uaipi.getToken();
   const service_status = await Promise.all(
     serpontos.map(async (ponto) => {
       try {
@@ -86,14 +85,13 @@ const getClientStatus = async (codcliente) => {
 
   const [payment, libtemp] = await Promise.all([
     checkCurrentInvoiceStatus(codcliente).catch(err => {
-      if (err.message.includes('sem fatura') || err.message.includes('não encontrada'))
-        return { status: 'sem fatura disponível', valor: '-', vencimento: null };
-      throw err;
+      logger.warn('Erro ao verificar fatura em getClientStatus', { codcliente, error: err.message });
+      return { status: 'sem fatura disponível', valor: '-', vencimento: null };
     }),
     consultarLibtempPorCliente(codcliente).catch(err => {
-      if (err.message.includes('Nenhuma liberação') || err.message.includes('não encontrada'))
-        return null;
-      throw err;
+      // libtemp é opcional — 404/any error = cliente sem liberação ativa
+      logger.warn('Erro ao consultar libtemp em getClientStatus', { codcliente, error: err.message });
+      return null;
     }),
   ]);
 
