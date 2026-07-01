@@ -201,7 +201,7 @@ router.get('/controle-parental/:id', ctrl.getControleParentalController);
  *                       type: number
  *                     diaSemana:
  *                       type: string
- *                       enum: [Segunda, Terca, Quarta, Quinta, Sexta, Sabado, Domingo]
+ *                       enum: [Segunda, "Terça", Quarta, Quinta, Sexta, "Sábado", Domingo]
  *                     hora:
  *                       type: number
  *                       description: 0 a 23
