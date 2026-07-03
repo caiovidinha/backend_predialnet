@@ -46,7 +46,8 @@ const deleteAppAccount = async (cpf) => {
 // E-mail cadastrado da conta do app (consulta e alteração). A alteração semeia
 // o novo e-mail no map censurado. Delegam para o AuthService.
 const getRegisteredEmail = (cpf) => authService.getRegisteredEmail({ cpf });
-const changeRegisteredEmail = (cpf, email) => authService.changeRegisteredEmail({ cpf, email });
+const changeRegisteredEmail = (cpf, email, codcliente) =>
+  authService.changeRegisteredEmail({ cpf, email, codcliente });
 
 // Notificações (push) recebidas pelo cliente no app, com data e leitura.
 const getNotifications = async (cpf) => {

@@ -250,36 +250,33 @@ const updateEmailCensored = async ({ cpf, censoredEmail }) => {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Atualiza o e-mail no cadastro da Predialnet (UAIPI) em TODOS os contratos do
-// CPF, via POST /clientes/:codcliente/set-email. Mantém o cadastro alinhado com
-// a conta do app para não divergir (o reset de senha depende disso).
-const _syncEmailToUAIPI = async (credential, newEmail) => {
-  const cliente = await getUsersFromUAIPI(credential);
+// Confirma que o codcliente pertence ao CPF e devolve a inscrição.
+const _findContract = async (cpf, codcliente) => {
+  const cliente = await getUsersFromUAIPI(cpf);
   if (!cliente) throw new NotFoundError('Não é cliente Predialnet.');
-
-  const inscricao = cliente.cpf;
-  const contratos = cliente.users.map((u) => u.cliente).filter((c) => c?.id != null);
-  if (!contratos.length) throw new NotFoundError('Nenhum contrato encontrado para atualizar o e-mail.');
-
-  for (const c of contratos) {
-    try {
-      await uaipi.post(`/clientes/${c.id}/set-email`, {
-        email: newEmail,
-        codcliente: String(c.id),
-        inscricao,
-      });
-    } catch (err) {
-      logger.error('Falha ao atualizar e-mail na UAIPI', { codcliente: c.id, error: err.message });
-      throw new AppError('Falha ao atualizar o e-mail na base da Predialnet.', 502);
-    }
-  }
-  logger.info('E-mail sincronizado na UAIPI', { inscricao, contratos: contratos.length });
+  const cod = String(codcliente ?? '');
+  const belongs = cliente.users.some((u) => String(u.cliente?.id) === cod);
+  if (!belongs) throw new ValidationError('codcliente não pertence a este CPF.');
+  return { inscricao: cliente.cpf, codcliente: cod };
 };
 
-// Aplica a troca em todo lugar: primeiro na Predialnet (UAIPI), depois semeia no
-// map censurado e atualiza a conta do app. Se a UAIPI falhar, nada local muda.
-const _applyEmailEverywhere = async (user, newEmail) => {
-  await _syncEmailToUAIPI(user.cpf, newEmail);
+// Atualiza o e-mail no cadastro da Predialnet (UAIPI) de UM contrato específico,
+// via POST /clientes/:codcliente/set-email.
+const _syncEmailToUAIPI = async (cpf, codcliente, newEmail) => {
+  const { inscricao, codcliente: cod } = await _findContract(cpf, codcliente);
+  try {
+    await uaipi.post(`/clientes/${cod}/set-email`, { email: newEmail, codcliente: cod, inscricao });
+  } catch (err) {
+    logger.error('Falha ao atualizar e-mail na UAIPI', { codcliente: cod, error: err.message });
+    throw new AppError('Falha ao atualizar o e-mail na base da Predialnet.', 502);
+  }
+  logger.info('E-mail atualizado na UAIPI', { inscricao, codcliente: cod });
+};
+
+// Aplica a troca: primeiro na Predialnet (contrato alvo), depois semeia no map
+// censurado e atualiza a conta do app. Se a UAIPI falhar, nada local muda.
+const _applyEmailEverywhere = async (user, codcliente, newEmail) => {
+  await _syncEmailToUAIPI(user.cpf, codcliente, newEmail);
   const censoredEmail = Array.from(await censorEmailList([newEmail]))[0] ?? null;
   await userRepo.updateEmail(user.id, newEmail);
   return censoredEmail;
@@ -297,11 +294,12 @@ const getRegisteredEmail = async ({ cpf }) => {
   return { cpf: c, email: user.email, censoredEmail };
 };
 
-// Altera o e-mail — atualiza a Predialnet (UAIPI, todos os contratos) e a conta
-// do app, semeando no map censurado. Usado pelo suporte (override direto).
-const changeRegisteredEmail = async ({ cpf, email }) => {
+// Altera o e-mail — atualiza a Predialnet (contrato informado) e a conta do app,
+// semeando no map censurado. Usado pelo suporte (override direto).
+const changeRegisteredEmail = async ({ cpf, email, codcliente }) => {
   const c = String(cpf ?? '').replace(/\D/g, '');
   if (c.length !== 11) throw new ValidationError('CPF inválido. Informe 11 dígitos.');
+  if (!codcliente) throw new ValidationError('codcliente é obrigatório.');
 
   const newEmail = String(email ?? '').trim();
   if (!EMAIL_REGEX.test(newEmail)) throw new ValidationError('E-mail inválido.');
@@ -309,10 +307,10 @@ const changeRegisteredEmail = async ({ cpf, email }) => {
   const user = await userRepo.findByCpf(c);
   if (!user) throw new NotFoundError('Conta do app não encontrada para este CPF.');
 
-  const censoredEmail = await _applyEmailEverywhere(user, newEmail);
-  logger.info('E-mail alterado (app + Predialnet)', { cpf: c });
+  const censoredEmail = await _applyEmailEverywhere(user, codcliente, newEmail);
+  logger.info('E-mail alterado (app + Predialnet)', { cpf: c, codcliente: String(codcliente) });
 
-  return { message: 'E-mail atualizado com sucesso.', cpf: c, email: newEmail, censoredEmail };
+  return { message: 'E-mail atualizado com sucesso.', cpf: c, codcliente: String(codcliente), email: newEmail, censoredEmail };
 };
 
 // ── Troca de e-mail do usuário com confirmação por código ─────────────────────
@@ -340,9 +338,10 @@ const emailChangeCodeTemplate = (code) => `
 
 // Passo 1: gera código, guarda a pendência e envia o código para o NOVO e-mail
 // (confirma a posse do endereço). Não altera nada até a confirmação.
-const requestEmailChange = async ({ cpf, email }) => {
+const requestEmailChange = async ({ cpf, email, codcliente }) => {
   const c = String(cpf ?? '').replace(/\D/g, '');
   if (c.length !== 11) throw new ValidationError('CPF inválido. Informe 11 dígitos.');
+  if (!codcliente) throw new ValidationError('codcliente é obrigatório.');
 
   const newEmail = String(email ?? '').trim();
   if (!EMAIL_REGEX.test(newEmail)) throw new ValidationError('E-mail inválido.');
@@ -352,9 +351,12 @@ const requestEmailChange = async ({ cpf, email }) => {
   if (newEmail.toLowerCase() === String(user.email).toLowerCase())
     throw new ValidationError('O novo e-mail é igual ao atual.');
 
+  // Valida que o contrato pertence ao CPF antes de enviar o código.
+  const { codcliente: cod } = await _findContract(c, codcliente);
+
   const code = generateEmailCode();
   const expiresIn = new Date(Date.now() + EMAIL_CHANGE_TTL_MIN * 60 * 1000);
-  await emailChangeRepo.upsert(user.id, { newEmail, code, expiresIn });
+  await emailChangeRepo.upsert(user.id, { newEmail, codcliente: cod, code, expiresIn });
 
   const result = await uaipi.sendEmail(
     newEmail,
@@ -386,8 +388,9 @@ const confirmEmailChange = async ({ cpf, code }) => {
   }
   if (String(code).trim() !== pending.code) throw new ForbiddenError('Código inválido.');
 
-  // Aplica na Predialnet + app. Se a UAIPI falhar, mantém a pendência para retry.
-  const censoredEmail = await _applyEmailEverywhere(user, pending.newEmail);
+  // Aplica na Predialnet (contrato guardado) + app. Se a UAIPI falhar, mantém a
+  // pendência para retry.
+  const censoredEmail = await _applyEmailEverywhere(user, pending.codcliente, pending.newEmail);
   await emailChangeRepo.deleteByUserId(user.id);
 
   logger.info('Troca de e-mail confirmada (app + Predialnet)', { cpf: c });

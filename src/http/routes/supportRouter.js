@@ -95,7 +95,7 @@ router.delete('/clients/:cpf/app-account', ctrl.deleteAppAccount);
  *       200: { description: "{ cpf, email, censoredEmail }" }
  *       404: { description: Conta do app não encontrada }
  *   put:
- *     summary: Altera o e-mail cadastrado da conta do app (semeia no map censurado)
+ *     summary: Altera o e-mail (Predialnet do contrato informado + conta do app)
  *     tags: [Support]
  *     parameters:
  *       - in: path
@@ -108,13 +108,15 @@ router.delete('/clients/:cpf/app-account', ctrl.deleteAppAccount);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email]
+ *             required: [email, codcliente]
  *             properties:
  *               email: { type: string }
+ *               codcliente: { type: string, description: Contrato a atualizar na Predialnet }
  *     responses:
- *       200: { description: "{ message, cpf, email, censoredEmail }" }
- *       400: { description: E-mail/CPF inválido }
+ *       200: { description: "{ message, cpf, codcliente, email, censoredEmail }" }
+ *       400: { description: E-mail/CPF/codcliente inválido }
  *       404: { description: Conta do app não encontrada }
+ *       502: { description: Falha ao atualizar na Predialnet (nada é alterado) }
  */
 router.get('/clients/:cpf/email', ctrl.getEmail);
 router.put('/clients/:cpf/email', ctrl.updateEmail);

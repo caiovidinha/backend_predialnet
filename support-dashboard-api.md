@@ -93,19 +93,20 @@ cliente continua existindo, só perde a conta do app. Operação atômica.
 ### 3c. Consultar / alterar o e-mail cadastrado (conta do app)
 ```
 GET  /support/clients/:cpf/email
-PUT  /support/clients/:cpf/email     Body: { "email": "novo@dominio.com" }
+PUT  /support/clients/:cpf/email     Body: { "email": "novo@dominio.com", "codcliente": "157175" }
 ```
 ```json
-// GET / PUT (200)
+// GET (200)
 { "cpf": "12345678901", "email": "cliente@dominio.com", "censoredEmail": "c***e@d***o.com" }
-// PUT também retorna: { "message": "E-mail atualizado com sucesso.", ... }
+// PUT (200)
+{ "message": "E-mail atualizado com sucesso.", "cpf": "12345678901", "codcliente": "157175", "email": "novo@dominio.com", "censoredEmail": "n***o@d***o.com" }
 ```
-- O **PUT atualiza o e-mail em TODOS os lugares**: no cadastro da Predialnet
-  (UAIPI, em todos os contratos do CPF via `set-email`) **e** na conta do app,
-  além de semear no map censurado. Assim o e-mail não diverge (o reset de senha
-  depende disso).
-- `400` e-mail/CPF inválido · `404` conta do app não encontrada · `502` falha ao
-  atualizar na base da Predialnet (nesse caso **nada é alterado** — pode repetir).
+- O **PUT exige `codcliente`** e atualiza o e-mail **naquele contrato** da
+  Predialnet (UAIPI `set-email`) **e** na conta do app, semeando no map censurado.
+  Outros contratos do CPF não são tocados. (Os contratos vêm de `.../contracts`.)
+- `400` e-mail/CPF/codcliente inválido (ou codcliente que não pertence ao CPF) ·
+  `404` conta do app não encontrada · `502` falha ao atualizar na Predialnet
+  (nesse caso **nada é alterado** — pode repetir).
 
 > **Suporte = override direto** (sem confirmação). Para o **próprio usuário**
 > (app), a troca é **confirmada por código** (ver abaixo). Em ambos, o e-mail é
@@ -116,10 +117,12 @@ Identidade pelo `x-access-token` do usuário (sem passar CPF). Dois passos:
 
 1. **Solicitar** — envia um código de 6 dígitos para o **novo** e-mail:
    ```
-   POST /account/email/change-request     Body: { "email": "novo@dominio.com" }
+   POST /account/email/change-request     Body: { "email": "novo@dominio.com", "codcliente": "157175" }
    → 200 { "message": "...", "email": "n***o@d***o.com" }   // nada é alterado ainda
    ```
-   `400` e-mail inválido/igual ao atual · `401` não autenticado · `502` falha no envio.
+   `codcliente` = contrato a atualizar na Predialnet (o app envia o contrato
+   selecionado). `400` e-mail inválido/igual ao atual ou codcliente ausente/inválido
+   · `401` não autenticado · `502` falha no envio.
 2. **Confirmar** — aplica a troca com o código recebido:
    ```
    POST /account/email/change-confirm     Body: { "code": "482913" }
@@ -128,8 +131,8 @@ Identidade pelo `x-access-token` do usuário (sem passar CPF). Dois passos:
    `403` código inválido/expirado · `404` nenhuma troca pendente · `502` falha ao
    atualizar na Predialnet (a pendência é mantida — pode confirmar de novo).
 
-A confirmação atualiza o e-mail **na Predialnet (UAIPI, todos os contratos) e na
-conta do app**, mantendo tudo alinhado.
+A confirmação atualiza o e-mail **na Predialnet (contrato informado) e na conta
+do app**, mantendo tudo alinhado.
 
 O código expira em **15 min**; uma pendência por usuário (novo pedido substitui o
 anterior). A confirmação semeia o novo e-mail no map censurado antes de aplicar.

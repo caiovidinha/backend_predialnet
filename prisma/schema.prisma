@@ -42,13 +42,14 @@ model RefreshToken {
 // Troca de e-mail da conta do app pendente de confirmação por código (enviado
 // ao novo e-mail). Uma pendência por usuário; expira e é consumida na confirmação.
 model EmailChange {
-  id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String   @unique
-  newEmail  String
-  code      String
-  expiresIn DateTime
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String   @unique
+  newEmail   String
+  codcliente String? // contrato (codcliente) alvo da troca na Predialnet
+  code       String
+  expiresIn  DateTime
+  createdAt  DateTime @default(now())
 
   @@map("email_changes")
 }

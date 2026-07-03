@@ -56,7 +56,7 @@ const getEmail = async (req, res) => {
 
 const updateEmail = async (req, res) => {
   try {
-    const result = await supportService.changeRegisteredEmail(req.params.cpf, req.body.email);
+    const result = await supportService.changeRegisteredEmail(req.params.cpf, req.body.email, req.body.codcliente);
     return res.status(200).json(result);
   } catch (err) {
     logger.warn('support updateEmail error', { error: err.message });

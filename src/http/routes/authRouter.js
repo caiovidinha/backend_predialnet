@@ -297,12 +297,13 @@ router.get('/account/email', attachClientIdentity, ctrl.getMyEmail);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email]
+ *             required: [email, codcliente]
  *             properties:
  *               email: { type: string, description: Novo e-mail desejado }
+ *               codcliente: { type: string, description: Contrato a atualizar na Predialnet }
  *     responses:
  *       200: { description: "{ message, email (censurado) } — código enviado" }
- *       400: { description: E-mail inválido ou igual ao atual }
+ *       400: { description: E-mail inválido/igual ao atual, ou codcliente ausente/inválido }
  *       401: { description: Não autenticado }
  *       502: { description: Falha ao enviar o e-mail do código }
  */

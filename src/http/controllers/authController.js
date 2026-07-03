@@ -128,7 +128,7 @@ const getMyEmail = async (req, res) => {
 const requestMyEmailChange = async (req, res) => {
   if (!req.cpf) return res.status(401).json({ error: 'Não autenticado.' });
   try {
-    const result = await authService.requestEmailChange({ cpf: req.cpf, email: req.body.email });
+    const result = await authService.requestEmailChange({ cpf: req.cpf, email: req.body.email, codcliente: req.body.codcliente });
     return res.status(200).json(result);
   } catch (err) {
     logger.warn('requestMyEmailChange falhou', { error: err.message });

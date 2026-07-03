@@ -2,11 +2,11 @@ const { client } = require('../../prisma/client');
 
 // Uma pendência de troca de e-mail por usuário (userId único): novo pedido
 // substitui o anterior.
-const upsert = (userId, { newEmail, code, expiresIn }) =>
+const upsert = (userId, { newEmail, codcliente, code, expiresIn }) =>
   client.emailChange.upsert({
     where: { userId },
-    update: { newEmail, code, expiresIn },
-    create: { userId, newEmail, code, expiresIn },
+    update: { newEmail, codcliente, code, expiresIn },
+    create: { userId, newEmail, codcliente, code, expiresIn },
   });
 
 const findByUserId = (userId) => client.emailChange.findUnique({ where: { userId } });
