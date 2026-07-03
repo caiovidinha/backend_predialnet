@@ -4,7 +4,7 @@ const utilitiesService = require('../utilities/UtilitiesService');
 const userRepo = require('../../infrastructure/repositories/userRepository');
 const tokenRepo = require('../../infrastructure/repositories/tokenRepository');
 const logger = require('../../utils/logger');
-const { ValidationError } = require('../../domain/errors/AppError');
+const { ValidationError, NotFoundError } = require('../../domain/errors/AppError');
 
 const onlyDigits = (v) => String(v ?? '').replace(/\D/g, '');
 
@@ -26,6 +26,20 @@ const getAppAccount = async (cpf) => {
     email: user.email,
     mustChangePassword: !passToken,
   };
+};
+
+// Exclui a conta do app (usuário local + relações). Não afeta o cadastro
+// Predialnet (UAIPI) — apaga só o acesso ao aplicativo.
+const deleteAppAccount = async (cpf) => {
+  const c = onlyDigits(cpf);
+  if (c.length !== 11) throw new ValidationError('CPF inválido. Informe 11 dígitos.');
+
+  const user = await userRepo.findByCpf(c);
+  if (!user) throw new NotFoundError('Conta do app não encontrada para este CPF.');
+
+  await userRepo.deleteWithRelations(user.id);
+  logger.info('Conta do app excluída pelo suporte', { cpf: c, userId: user.id });
+  return { deleted: true, cpf: c, userId: user.id };
 };
 
 // ── Consultas na base da Predialnet (UAIPI) ──────────────────────────────────
@@ -167,6 +181,7 @@ const getOverview = async (credential) => {
 
 module.exports = {
   getAppAccount,
+  deleteAppAccount,
   isClient,
   getAccount,
   getContracts,

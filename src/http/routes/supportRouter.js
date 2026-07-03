@@ -61,8 +61,24 @@ router.get('/clients/:credential/is-client', ctrl.isClient);
  *     responses:
  *       200: { description: "{ exists, cpf, userId, email, mustChangePassword }" }
  *       400: { description: CPF inválido }
+ *   delete:
+ *     summary: Exclui a conta do app do cliente (usuário local + relações)
+ *     tags: [Support]
+ *     description: >
+ *       Apaga apenas o acesso ao aplicativo (usuário, tokens, push tokens,
+ *       notificações). NÃO afeta o cadastro do cliente na Predialnet (UAIPI).
+ *     parameters:
+ *       - in: path
+ *         name: cpf
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: "{ deleted: true, cpf, userId }" }
+ *       400: { description: CPF inválido }
+ *       404: { description: Conta do app não encontrada }
  */
 router.get('/clients/:cpf/app-account', ctrl.appAccount);
+router.delete('/clients/:cpf/app-account', ctrl.deleteAppAccount);
 
 /**
  * @swagger

@@ -73,6 +73,23 @@ GET /support/clients/:cpf/app-account
 ```
 Não existe: `{ "exists": false, "cpf": "12345678901" }`. CPF inválido → `400`.
 
+### 3a. Excluir a conta do app do cliente
+```
+DELETE /support/clients/:cpf/app-account
+```
+Apaga **apenas o acesso ao aplicativo** (usuário local + tokens, push tokens e
+notificações). **Não** afeta o cadastro do cliente na Predialnet (UAIPI) — o
+cliente continua existindo, só perde a conta do app. Operação atômica.
+```json
+{ "deleted": true, "cpf": "12345678901", "userId": "uuid" }
+```
+- `400` — CPF inválido.
+- `404` — conta do app não encontrada para esse CPF.
+
+> 💡 Ação destrutiva — peça confirmação no front antes de chamar. Depois de
+> excluir, o cliente pode criar a conta de novo pelo fluxo normal do app (ou via
+> "Criar conta do app", passo 13).
+
 ### 3b. Contratos (números de cliente) de um CPF
 ```
 GET /support/clients/:credential/contracts

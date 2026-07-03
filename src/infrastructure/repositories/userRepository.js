@@ -19,6 +19,17 @@ const findManyByCpfs = (cpfs) =>
 const findPasswordToken = (userId) =>
   client.passwordToken.findFirst({ where: { userId } });
 
+// Remove o usuário e todas as relações (o schema não tem cascade) de forma atômica.
+const deleteWithRelations = (userId) =>
+  client.$transaction([
+    client.refreshToken.deleteMany({ where: { userId } }),
+    client.passwordToken.deleteMany({ where: { userId } }),
+    client.showAd.deleteMany({ where: { userId } }),
+    client.pushToken.deleteMany({ where: { userId } }),
+    client.userNotification.deleteMany({ where: { userId } }),
+    client.user.delete({ where: { id: userId } }),
+  ]);
+
 module.exports = {
   findByCpf,
   findById,
@@ -29,4 +40,5 @@ module.exports = {
   updateEmail,
   findManyByCpfs,
   findPasswordToken,
+  deleteWithRelations,
 };
