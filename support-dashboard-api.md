@@ -90,6 +90,25 @@ cliente continua existindo, só perde a conta do app. Operação atômica.
 > excluir, o cliente pode criar a conta de novo pelo fluxo normal do app (ou via
 > "Criar conta do app", passo 13).
 
+### 3c. Consultar / alterar o e-mail cadastrado (conta do app)
+```
+GET  /support/clients/:cpf/email
+PUT  /support/clients/:cpf/email     Body: { "email": "novo@dominio.com" }
+```
+Refere-se ao e-mail da **conta do app** (`User.email`), não ao cadastro da UAIPI.
+```json
+// GET / PUT (200)
+{ "cpf": "12345678901", "email": "cliente@dominio.com", "censoredEmail": "c***e@d***o.com" }
+// PUT também retorna: { "message": "E-mail atualizado com sucesso.", ... }
+```
+- O **PUT semeia o novo e-mail no map censurado** (tabela `Emails`) antes de
+  atualizar — assim ele fica disponível pros fluxos que usam e-mail censurado.
+- `400` e-mail/CPF inválido · `404` conta do app não encontrada.
+
+> Existe o par equivalente **para o próprio usuário** (app), com identidade pelo
+> token, sem passar CPF: `GET /account/email` e `PUT /account/email`
+> (body `{ email }`). Mesmos retornos; `401` se não autenticado.
+
 ### 3b. Contratos (números de cliente) de um CPF
 ```
 GET /support/clients/:credential/contracts

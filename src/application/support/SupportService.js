@@ -42,6 +42,11 @@ const deleteAppAccount = async (cpf) => {
   return { deleted: true, cpf: c, userId: user.id };
 };
 
+// E-mail cadastrado da conta do app (consulta e alteração). A alteração semeia
+// o novo e-mail no map censurado. Delegam para o AuthService.
+const getRegisteredEmail = (cpf) => authService.getRegisteredEmail({ cpf });
+const changeRegisteredEmail = (cpf, email) => authService.changeRegisteredEmail({ cpf, email });
+
 // ── Consultas na base da Predialnet (UAIPI) ──────────────────────────────────
 
 // É cliente Predialnet? Aceita CPF ou codcliente como credential.
@@ -182,6 +187,8 @@ const getOverview = async (credential) => {
 module.exports = {
   getAppAccount,
   deleteAppAccount,
+  getRegisteredEmail,
+  changeRegisteredEmail,
   isClient,
   getAccount,
   getContracts,

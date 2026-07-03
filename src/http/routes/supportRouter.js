@@ -82,6 +82,45 @@ router.delete('/clients/:cpf/app-account', ctrl.deleteAppAccount);
 
 /**
  * @swagger
+ * /support/clients/{cpf}/email:
+ *   get:
+ *     summary: Consulta o e-mail cadastrado da conta do app do cliente
+ *     tags: [Support]
+ *     parameters:
+ *       - in: path
+ *         name: cpf
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: "{ cpf, email, censoredEmail }" }
+ *       404: { description: Conta do app não encontrada }
+ *   put:
+ *     summary: Altera o e-mail cadastrado da conta do app (semeia no map censurado)
+ *     tags: [Support]
+ *     parameters:
+ *       - in: path
+ *         name: cpf
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string }
+ *     responses:
+ *       200: { description: "{ message, cpf, email, censoredEmail }" }
+ *       400: { description: E-mail/CPF inválido }
+ *       404: { description: Conta do app não encontrada }
+ */
+router.get('/clients/:cpf/email', ctrl.getEmail);
+router.put('/clients/:cpf/email', ctrl.updateEmail);
+
+/**
+ * @swagger
  * /support/clients/{credential}/contracts:
  *   get:
  *     summary: Lista os contratos (números de cliente) de um CPF

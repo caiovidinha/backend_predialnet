@@ -247,6 +247,39 @@ const updateEmailCensored = async ({ cpf, censoredEmail }) => {
   return { message: 'E-mail atualizado com sucesso.' };
 };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Consulta o e-mail cadastrado da conta do app (com a versão censurada do map).
+const getRegisteredEmail = async ({ cpf }) => {
+  const c = String(cpf ?? '').replace(/\D/g, '');
+  if (c.length !== 11) throw new ValidationError('CPF inválido. Informe 11 dígitos.');
+
+  const user = await userRepo.findByCpf(c);
+  if (!user) throw new NotFoundError('Conta do app não encontrada para este CPF.');
+
+  const censoredEmail = Array.from(await censorEmailList([user.email]))[0] ?? null;
+  return { cpf: c, email: user.email, censoredEmail };
+};
+
+// Altera o e-mail da conta do app. Sempre semeia o novo e-mail no map censurado
+// (cria a censura se ainda não existir) para mantê-lo disponível ao fluxo censurado.
+const changeRegisteredEmail = async ({ cpf, email }) => {
+  const c = String(cpf ?? '').replace(/\D/g, '');
+  if (c.length !== 11) throw new ValidationError('CPF inválido. Informe 11 dígitos.');
+
+  const newEmail = String(email ?? '').trim();
+  if (!EMAIL_REGEX.test(newEmail)) throw new ValidationError('E-mail inválido.');
+
+  const user = await userRepo.findByCpf(c);
+  if (!user) throw new NotFoundError('Conta do app não encontrada para este CPF.');
+
+  const censoredEmail = Array.from(await censorEmailList([newEmail]))[0] ?? null;
+  await userRepo.updateEmail(user.id, newEmail);
+  logger.info('E-mail da conta do app alterado', { cpf: c });
+
+  return { message: 'E-mail atualizado com sucesso.', cpf: c, email: newEmail, censoredEmail };
+};
+
 const mustChangePasswordCheck = async ({ cpf }) => {
   if (!cpf) throw new ValidationError('CPF não fornecido');
   const user = await userRepo.findByCpf(cpf);
@@ -288,6 +321,8 @@ module.exports = {
   resetPassword,
   updateEmail,
   updateEmailCensored,
+  getRegisteredEmail,
+  changeRegisteredEmail,
   mustChangePasswordCheck,
   renewToken,
   sendEmail,

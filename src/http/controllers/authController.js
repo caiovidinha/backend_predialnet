@@ -112,6 +112,30 @@ const mustChangePasswordCheck = async (req, res) => {
   }
 };
 
+// Usuário logado consulta o próprio e-mail cadastrado (identidade via token).
+const getMyEmail = async (req, res) => {
+  if (!req.cpf) return res.status(401).json({ error: 'Não autenticado.' });
+  try {
+    const result = await authService.getRegisteredEmail({ cpf: req.cpf });
+    return res.status(200).json(result);
+  } catch (err) {
+    logger.warn('getMyEmail falhou', { error: err.message });
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+};
+
+// Usuário logado altera o próprio e-mail cadastrado (semeia no map censurado).
+const updateMyEmail = async (req, res) => {
+  if (!req.cpf) return res.status(401).json({ error: 'Não autenticado.' });
+  try {
+    const result = await authService.changeRegisteredEmail({ cpf: req.cpf, email: req.body.email });
+    return res.status(200).json(result);
+  } catch (err) {
+    logger.warn('updateMyEmail falhou', { error: err.message });
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+};
+
 const handleEmail = async (req, res) => {
   try {
     const result = await authService.sendEmail({
@@ -129,4 +153,5 @@ const handleEmail = async (req, res) => {
 module.exports = {
   getOk, newUser, createUser, login, renewToken, forgotPassword,
   resetPassword, updateEmail, updateEmailCensored, mustChangePasswordCheck, handleEmail,
+  getMyEmail, updateMyEmail,
 };

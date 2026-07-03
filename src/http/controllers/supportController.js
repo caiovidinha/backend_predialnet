@@ -44,6 +44,26 @@ const deleteAppAccount = async (req, res) => {
   }
 };
 
+const getEmail = async (req, res) => {
+  try {
+    const result = await supportService.getRegisteredEmail(req.params.cpf);
+    return res.status(200).json(result);
+  } catch (err) {
+    logger.warn('support getEmail error', { error: err.message });
+    return res.status(errStatus(err)).json({ error: err.message });
+  }
+};
+
+const updateEmail = async (req, res) => {
+  try {
+    const result = await supportService.changeRegisteredEmail(req.params.cpf, req.body.email);
+    return res.status(200).json(result);
+  } catch (err) {
+    logger.warn('support updateEmail error', { error: err.message });
+    return res.status(errStatus(err)).json({ error: err.message });
+  }
+};
+
 const contracts = async (req, res) => {
   try {
     const result = await supportService.getContracts(req.params.credential);
@@ -171,6 +191,8 @@ module.exports = {
   overview,
   appAccount,
   deleteAppAccount,
+  getEmail,
+  updateEmail,
   isClient,
   contracts,
   account,

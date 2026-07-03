@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const ctrl = require('../controllers/authController');
-const { validateJWT } = require('../middlewares/auth');
+const { validateJWT, attachClientIdentity } = require('../middlewares/auth');
 
 const router = express.Router();
 
@@ -266,5 +266,37 @@ router.post('/update-email', validateJWT, ctrl.updateEmail);
  *         description: Usuário ou e-mail não encontrado
  */
 router.post('/update-email-censored', validateJWT, ctrl.updateEmailCensored);
+
+/**
+ * @swagger
+ * /account/email:
+ *   get:
+ *     summary: Consulta o e-mail cadastrado da conta do app (usuário logado)
+ *     tags: [Usuário]
+ *     description: Identidade resolvida pelo x-access-token do próprio usuário.
+ *     responses:
+ *       200: { description: "{ cpf, email, censoredEmail }" }
+ *       401: { description: Não autenticado }
+ *       404: { description: Conta do app não encontrada }
+ *   put:
+ *     summary: Altera o e-mail cadastrado da conta do app (usuário logado)
+ *     tags: [Usuário]
+ *     description: Semeia o novo e-mail no map censurado antes de atualizar.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string }
+ *     responses:
+ *       200: { description: "{ message, cpf, email, censoredEmail }" }
+ *       400: { description: E-mail inválido }
+ *       401: { description: Não autenticado }
+ */
+router.get('/account/email', attachClientIdentity, ctrl.getMyEmail);
+router.put('/account/email', attachClientIdentity, ctrl.updateMyEmail);
 
 module.exports = router;
