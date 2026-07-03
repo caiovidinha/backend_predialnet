@@ -89,11 +89,12 @@ router.get('/ping', ping);
  *     summary: Persiste o resultado detalhado de um teste (medido no cliente)
  *     tags: [Speedtest]
  *     description: >
- *       Envie o x-access-token do cliente para amarrar o teste ao cliente
- *       (userId/cpf são resolvidos a partir do token, independente de ENABLE_JWT).
- *       Sem token válido, o teste é gravado como anônimo. Aceita payload achatado
- *       ou aninhado (download/upload/ping/device). IP e user-agent são capturados
- *       no servidor. Campos desconhecidos são preservados em `raw`.
+ *       Envie o cpf do cliente no body para amarrar o teste (tem precedência).
+ *       Como fallback, o x-access-token também é decodificado best-effort para
+ *       resolver userId/cpf, independente de ENABLE_JWT. Sem nenhum dos dois, o
+ *       teste é gravado como anônimo. Aceita payload achatado ou aninhado
+ *       (download/upload/ping/device). IP e user-agent são capturados no
+ *       servidor. Campos desconhecidos são preservados em `raw`.
  *     requestBody:
  *       required: true
  *       content:
@@ -101,6 +102,8 @@ router.get('/ping', ping);
  *           schema:
  *             type: object
  *             properties:
+ *               cpf: { type: string, example: "12345678901", description: "CPF do cliente; tem precedência sobre o token" }
+ *               userId: { type: string, description: "Opcional; fallback é o token" }
  *               downloadMbps: { type: number, example: 287.4 }
  *               uploadMbps: { type: number, example: 112.9 }
  *               pingMs: { type: number, example: 8.2 }

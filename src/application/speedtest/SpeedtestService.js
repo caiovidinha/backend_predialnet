@@ -45,9 +45,13 @@ function normalize(payload = {}, context = {}) {
     pingSamples = null;
   }
 
+  // cpf/userId: o body tem precedência (o app já sabe quem é o cliente);
+  // o token (context) fica como fallback. cpf é sanitizado para só dígitos.
+  const bodyCpf = payload.cpf ? String(payload.cpf).replace(/\D/g, '') || null : null;
+
   return {
-    userId: context.userId ?? null,
-    cpf: context.cpf ?? null,
+    userId: payload.userId ?? context.userId ?? null,
+    cpf: bodyCpf ?? context.cpf ?? null,
 
     downloadMbps: toNum(payload.downloadMbps ?? payload.download_mbps ?? download.mbps),
     uploadMbps: toNum(payload.uploadMbps ?? payload.upload_mbps ?? upload.mbps),
