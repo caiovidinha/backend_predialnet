@@ -5,8 +5,9 @@ const uaipi = require('../../infrastructure/external/uaipiClient');
 const userRepo = require('../../infrastructure/repositories/userRepository');
 const emailRepo = require('../../infrastructure/repositories/emailRepository');
 const tokenRepo = require('../../infrastructure/repositories/tokenRepository');
+const emailChangeRepo = require('../../infrastructure/repositories/emailChangeRepository');
 const logger = require('../../utils/logger');
-const { AuthError, ForbiddenError, NotFoundError, ValidationError } = require('../../domain/errors/AppError');
+const { AppError, AuthError, ForbiddenError, NotFoundError, ValidationError } = require('../../domain/errors/AppError');
 
 // ──────────────────────────────────────────────────────────────
 // Helpers
@@ -280,6 +281,85 @@ const changeRegisteredEmail = async ({ cpf, email }) => {
   return { message: 'E-mail atualizado com sucesso.', cpf: c, email: newEmail, censoredEmail };
 };
 
+// ── Troca de e-mail do usuário com confirmação por código ─────────────────────
+
+const EMAIL_CHANGE_TTL_MIN = 15;
+const generateEmailCode = () => String(Math.floor(100000 + Math.random() * 900000));
+
+const emailChangeCodeTemplate = (code) => `
+  <div style="max-width:600px;margin:0 auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,.1)">
+    <div style="text-align:center;padding:20px;background:#9c0004;color:#fff;border-radius:8px 8px 0 0">
+      <img src="https://www.predialnet.com.br/download/logo_predialnet_branca.png" alt="Logo Predialnet" style="max-width:150px;margin-bottom:10px">
+      <h1 style="margin:0">Confirmação de troca de e-mail</h1>
+    </div>
+    <div style="padding:20px;text-align:center">
+      <p>Recebemos um pedido para alterar o e-mail da sua conta no app Minha Predialnet.</p>
+      <p>Use o código abaixo no aplicativo para confirmar a troca:</p>
+      <div style="background:#f2f2f2;padding:15px;margin:20px auto;border-radius:8px;font-size:28px;font-weight:bold;letter-spacing:6px;color:#333;display:inline-block">${code}</div>
+      <p>O código expira em ${EMAIL_CHANGE_TTL_MIN} minutos.</p>
+      <p>Se você não solicitou esta troca, ignore este e-mail — nada será alterado.</p>
+    </div>
+    <div style="text-align:center;padding:20px;font-size:12px;color:#888">
+      <p>Precisa de ajuda? <a href="mailto:suporte@predialnet.com.br" style="color:#9c0004">suporte@predialnet.com.br</a></p>
+    </div>
+  </div>`;
+
+// Passo 1: gera código, guarda a pendência e envia o código para o NOVO e-mail
+// (confirma a posse do endereço). Não altera nada até a confirmação.
+const requestEmailChange = async ({ cpf, email }) => {
+  const c = String(cpf ?? '').replace(/\D/g, '');
+  if (c.length !== 11) throw new ValidationError('CPF inválido. Informe 11 dígitos.');
+
+  const newEmail = String(email ?? '').trim();
+  if (!EMAIL_REGEX.test(newEmail)) throw new ValidationError('E-mail inválido.');
+
+  const user = await userRepo.findByCpf(c);
+  if (!user) throw new NotFoundError('Conta do app não encontrada para este CPF.');
+  if (newEmail.toLowerCase() === String(user.email).toLowerCase())
+    throw new ValidationError('O novo e-mail é igual ao atual.');
+
+  const code = generateEmailCode();
+  const expiresIn = new Date(Date.now() + EMAIL_CHANGE_TTL_MIN * 60 * 1000);
+  await emailChangeRepo.upsert(user.id, { newEmail, code, expiresIn });
+
+  const result = await uaipi.sendEmail(
+    newEmail,
+    'Confirmação de troca de e-mail | Minha Predialnet',
+    emailChangeCodeTemplate(code),
+  );
+  if (result?.error) throw new AppError('Não foi possível enviar o código de confirmação.', 502);
+
+  logger.info('Troca de e-mail solicitada (código enviado)', { cpf: c });
+  return { message: 'Enviamos um código de confirmação para o novo e-mail.', email: censorEmail(newEmail) };
+};
+
+// Passo 2: valida o código pendente e, se ok, aplica a troca (semeia no map
+// censurado + atualiza) e consome a pendência.
+const confirmEmailChange = async ({ cpf, code }) => {
+  const c = String(cpf ?? '').replace(/\D/g, '');
+  if (c.length !== 11) throw new ValidationError('CPF inválido. Informe 11 dígitos.');
+  if (!code) throw new ValidationError('Código é obrigatório.');
+
+  const user = await userRepo.findByCpf(c);
+  if (!user) throw new NotFoundError('Conta do app não encontrada para este CPF.');
+
+  const pending = await emailChangeRepo.findByUserId(user.id);
+  if (!pending) throw new NotFoundError('Nenhuma troca de e-mail pendente.');
+
+  if (new Date() > pending.expiresIn) {
+    await emailChangeRepo.deleteByUserId(user.id);
+    throw new ForbiddenError('Código expirado. Solicite a troca novamente.');
+  }
+  if (String(code).trim() !== pending.code) throw new ForbiddenError('Código inválido.');
+
+  const censoredEmail = Array.from(await censorEmailList([pending.newEmail]))[0] ?? null;
+  await userRepo.updateEmail(user.id, pending.newEmail);
+  await emailChangeRepo.deleteByUserId(user.id);
+
+  logger.info('Troca de e-mail confirmada', { cpf: c });
+  return { message: 'E-mail atualizado com sucesso.', cpf: c, email: pending.newEmail, censoredEmail };
+};
+
 const mustChangePasswordCheck = async ({ cpf }) => {
   if (!cpf) throw new ValidationError('CPF não fornecido');
   const user = await userRepo.findByCpf(cpf);
@@ -323,6 +403,8 @@ module.exports = {
   updateEmailCensored,
   getRegisteredEmail,
   changeRegisteredEmail,
+  requestEmailChange,
+  confirmEmailChange,
   mustChangePasswordCheck,
   renewToken,
   sendEmail,

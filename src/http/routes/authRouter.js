@@ -278,10 +278,19 @@ router.post('/update-email-censored', validateJWT, ctrl.updateEmailCensored);
  *       200: { description: "{ cpf, email, censoredEmail }" }
  *       401: { description: Não autenticado }
  *       404: { description: Conta do app não encontrada }
- *   put:
- *     summary: Altera o e-mail cadastrado da conta do app (usuário logado)
+ */
+router.get('/account/email', attachClientIdentity, ctrl.getMyEmail);
+
+/**
+ * @swagger
+ * /account/email/change-request:
+ *   post:
+ *     summary: Solicita troca do e-mail (envia código ao novo e-mail)
  *     tags: [Usuário]
- *     description: Semeia o novo e-mail no map censurado antes de atualizar.
+ *     description: >
+ *       Passo 1. Gera um código de 6 dígitos, guarda a pendência e envia o
+ *       código para o NOVO e-mail. Nada é alterado até a confirmação. Identidade
+ *       pelo x-access-token do usuário.
  *     requestBody:
  *       required: true
  *       content:
@@ -290,13 +299,37 @@ router.post('/update-email-censored', validateJWT, ctrl.updateEmailCensored);
  *             type: object
  *             required: [email]
  *             properties:
- *               email: { type: string }
+ *               email: { type: string, description: Novo e-mail desejado }
+ *     responses:
+ *       200: { description: "{ message, email (censurado) } — código enviado" }
+ *       400: { description: E-mail inválido ou igual ao atual }
+ *       401: { description: Não autenticado }
+ *       502: { description: Falha ao enviar o e-mail do código }
+ */
+router.post('/account/email/change-request', attachClientIdentity, ctrl.requestMyEmailChange);
+
+/**
+ * @swagger
+ * /account/email/change-confirm:
+ *   post:
+ *     summary: Confirma a troca do e-mail com o código recebido
+ *     tags: [Usuário]
+ *     description: Passo 2. Valida o código e aplica a troca (semeia no map censurado).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code]
+ *             properties:
+ *               code: { type: string, example: "482913" }
  *     responses:
  *       200: { description: "{ message, cpf, email, censoredEmail }" }
- *       400: { description: E-mail inválido }
  *       401: { description: Não autenticado }
+ *       403: { description: Código inválido ou expirado }
+ *       404: { description: Nenhuma troca pendente }
  */
-router.get('/account/email', attachClientIdentity, ctrl.getMyEmail);
-router.put('/account/email', attachClientIdentity, ctrl.updateMyEmail);
+router.post('/account/email/change-confirm', attachClientIdentity, ctrl.confirmMyEmailChange);
 
 module.exports = router;

@@ -27,6 +27,7 @@ const deleteWithRelations = (userId) =>
     client.showAd.deleteMany({ where: { userId } }),
     client.pushToken.deleteMany({ where: { userId } }),
     client.userNotification.deleteMany({ where: { userId } }),
+    client.emailChange.deleteMany({ where: { userId } }),
     client.user.delete({ where: { id: userId } }),
   ]);
 

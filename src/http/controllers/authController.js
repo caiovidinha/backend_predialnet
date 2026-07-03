@@ -124,14 +124,26 @@ const getMyEmail = async (req, res) => {
   }
 };
 
-// Usuário logado altera o próprio e-mail cadastrado (semeia no map censurado).
-const updateMyEmail = async (req, res) => {
+// Usuário logado solicita a troca do próprio e-mail — envia código ao novo e-mail.
+const requestMyEmailChange = async (req, res) => {
   if (!req.cpf) return res.status(401).json({ error: 'Não autenticado.' });
   try {
-    const result = await authService.changeRegisteredEmail({ cpf: req.cpf, email: req.body.email });
+    const result = await authService.requestEmailChange({ cpf: req.cpf, email: req.body.email });
     return res.status(200).json(result);
   } catch (err) {
-    logger.warn('updateMyEmail falhou', { error: err.message });
+    logger.warn('requestMyEmailChange falhou', { error: err.message });
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+};
+
+// Usuário logado confirma a troca com o código recebido.
+const confirmMyEmailChange = async (req, res) => {
+  if (!req.cpf) return res.status(401).json({ error: 'Não autenticado.' });
+  try {
+    const result = await authService.confirmEmailChange({ cpf: req.cpf, code: req.body.code });
+    return res.status(200).json(result);
+  } catch (err) {
+    logger.warn('confirmMyEmailChange falhou', { error: err.message });
     return res.status(err.statusCode || 500).json({ error: err.message });
   }
 };
@@ -153,5 +165,5 @@ const handleEmail = async (req, res) => {
 module.exports = {
   getOk, newUser, createUser, login, renewToken, forgotPassword,
   resetPassword, updateEmail, updateEmailCensored, mustChangePasswordCheck, handleEmail,
-  getMyEmail, updateMyEmail,
+  getMyEmail, requestMyEmailChange, confirmMyEmailChange,
 };

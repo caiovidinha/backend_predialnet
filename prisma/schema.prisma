@@ -17,6 +17,7 @@ model User {
   show_ad           ShowAd?
   pushTokens        PushToken[]
   userNotifications UserNotification[]  // ← nova relação
+  email_change      EmailChange?
 
   @@map("users")
 }
@@ -36,6 +37,20 @@ model RefreshToken {
   userId    String @unique
 
   @@map("refresh_token")
+}
+
+// Troca de e-mail da conta do app pendente de confirmação por código (enviado
+// ao novo e-mail). Uma pendência por usuário; expira e é consumida na confirmação.
+model EmailChange {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  newEmail  String
+  code      String
+  expiresIn DateTime
+  createdAt DateTime @default(now())
+
+  @@map("email_changes")
 }
 
 model PasswordToken {

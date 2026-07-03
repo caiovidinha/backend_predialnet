@@ -105,9 +105,29 @@ Refere-se ao e-mail da **conta do app** (`User.email`), não ao cadastro da UAIP
   atualizar — assim ele fica disponível pros fluxos que usam e-mail censurado.
 - `400` e-mail/CPF inválido · `404` conta do app não encontrada.
 
-> Existe o par equivalente **para o próprio usuário** (app), com identidade pelo
-> token, sem passar CPF: `GET /account/email` e `PUT /account/email`
-> (body `{ email }`). Mesmos retornos; `401` se não autenticado.
+> **Suporte = override direto** (sem confirmação). Para o **próprio usuário**
+> (app), a troca é **confirmada por código** (ver abaixo). O suporte não altera
+> nada na base da Predialnet (UAIPI) — só a conta do app.
+
+#### Troca pelo próprio usuário (app) — confirmada por código
+Identidade pelo `x-access-token` do usuário (sem passar CPF). Dois passos:
+
+1. **Solicitar** — envia um código de 6 dígitos para o **novo** e-mail:
+   ```
+   POST /account/email/change-request     Body: { "email": "novo@dominio.com" }
+   → 200 { "message": "...", "email": "n***o@d***o.com" }   // nada é alterado ainda
+   ```
+   `400` e-mail inválido/igual ao atual · `401` não autenticado · `502` falha no envio.
+2. **Confirmar** — aplica a troca com o código recebido:
+   ```
+   POST /account/email/change-confirm     Body: { "code": "482913" }
+   → 200 { "message": "E-mail atualizado com sucesso.", "cpf", "email", "censoredEmail" }
+   ```
+   `403` código inválido/expirado · `404` nenhuma troca pendente.
+
+O código expira em **15 min**; uma pendência por usuário (novo pedido substitui o
+anterior). A confirmação semeia o novo e-mail no map censurado antes de aplicar.
+Consulta continua em `GET /account/email`.
 
 ### 3b. Contratos (números de cliente) de um CPF
 ```
