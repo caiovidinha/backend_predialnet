@@ -3,6 +3,7 @@ const faturaService = require('../fatura/FaturaService');
 const utilitiesService = require('../utilities/UtilitiesService');
 const userRepo = require('../../infrastructure/repositories/userRepository');
 const tokenRepo = require('../../infrastructure/repositories/tokenRepository');
+const userNotificationRepo = require('../../infrastructure/repositories/userNotificationRepository');
 const logger = require('../../utils/logger');
 const { ValidationError, NotFoundError } = require('../../domain/errors/AppError');
 
@@ -46,6 +47,34 @@ const deleteAppAccount = async (cpf) => {
 // o novo e-mail no map censurado. Delegam para o AuthService.
 const getRegisteredEmail = (cpf) => authService.getRegisteredEmail({ cpf });
 const changeRegisteredEmail = (cpf, email) => authService.changeRegisteredEmail({ cpf, email });
+
+// Notificações (push) recebidas pelo cliente no app, com data e leitura.
+const getNotifications = async (cpf) => {
+  const c = String(cpf ?? '').replace(/\D/g, '');
+  if (c.length !== 11) throw new ValidationError('CPF inválido. Informe 11 dígitos.');
+
+  const user = await userRepo.findByCpf(c);
+  if (!user) throw new NotFoundError('Conta do app não encontrada para este CPF.');
+
+  const rows = await userNotificationRepo.findByUserId(user.id);
+  const notifications = rows.map((r) => ({
+    id: r.id,
+    title: r.notification?.title ?? null,
+    body: r.notification?.body ?? null,
+    data: r.notification?.data ?? null,
+    read: r.read,
+    readAt: r.readAt,
+    receivedAt: r.createdAt, // quando chegou para o cliente
+    sentAt: r.notification?.createdAt ?? null, // quando a notificação foi criada
+  }));
+
+  return {
+    cpf: c,
+    total: notifications.length,
+    unread: notifications.filter((n) => !n.read).length,
+    notifications,
+  };
+};
 
 // ── Consultas na base da Predialnet (UAIPI) ──────────────────────────────────
 
@@ -189,6 +218,7 @@ module.exports = {
   deleteAppAccount,
   getRegisteredEmail,
   changeRegisteredEmail,
+  getNotifications,
   isClient,
   getAccount,
   getContracts,

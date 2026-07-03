@@ -121,6 +121,24 @@ router.put('/clients/:cpf/email', ctrl.updateEmail);
 
 /**
  * @swagger
+ * /support/clients/{cpf}/notifications:
+ *   get:
+ *     summary: Notificações (push) recebidas pelo cliente, com data e leitura
+ *     tags: [Support]
+ *     parameters:
+ *       - in: path
+ *         name: cpf
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: "{ cpf, total, unread, notifications[] } — mais recentes primeiro"
+ *       404: { description: Conta do app não encontrada }
+ */
+router.get('/clients/:cpf/notifications', ctrl.notifications);
+
+/**
+ * @swagger
  * /support/clients/{credential}/contracts:
  *   get:
  *     summary: Lista os contratos (números de cliente) de um CPF

@@ -64,6 +64,16 @@ const updateEmail = async (req, res) => {
   }
 };
 
+const notifications = async (req, res) => {
+  try {
+    const result = await supportService.getNotifications(req.params.cpf);
+    return res.status(200).json(result);
+  } catch (err) {
+    logger.warn('support notifications error', { error: err.message });
+    return res.status(errStatus(err)).json({ error: err.message });
+  }
+};
+
 const contracts = async (req, res) => {
   try {
     const result = await supportService.getContracts(req.params.credential);
@@ -193,6 +203,7 @@ module.exports = {
   deleteAppAccount,
   getEmail,
   updateEmail,
+  notifications,
   isClient,
   contracts,
   account,

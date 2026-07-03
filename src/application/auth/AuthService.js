@@ -250,6 +250,41 @@ const updateEmailCensored = async ({ cpf, censoredEmail }) => {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Atualiza o e-mail no cadastro da Predialnet (UAIPI) em TODOS os contratos do
+// CPF, via POST /clientes/:codcliente/set-email. Mantém o cadastro alinhado com
+// a conta do app para não divergir (o reset de senha depende disso).
+const _syncEmailToUAIPI = async (credential, newEmail) => {
+  const cliente = await getUsersFromUAIPI(credential);
+  if (!cliente) throw new NotFoundError('Não é cliente Predialnet.');
+
+  const inscricao = cliente.cpf;
+  const contratos = cliente.users.map((u) => u.cliente).filter((c) => c?.id != null);
+  if (!contratos.length) throw new NotFoundError('Nenhum contrato encontrado para atualizar o e-mail.');
+
+  for (const c of contratos) {
+    try {
+      await uaipi.post(`/clientes/${c.id}/set-email`, {
+        email: newEmail,
+        codcliente: String(c.id),
+        inscricao,
+      });
+    } catch (err) {
+      logger.error('Falha ao atualizar e-mail na UAIPI', { codcliente: c.id, error: err.message });
+      throw new AppError('Falha ao atualizar o e-mail na base da Predialnet.', 502);
+    }
+  }
+  logger.info('E-mail sincronizado na UAIPI', { inscricao, contratos: contratos.length });
+};
+
+// Aplica a troca em todo lugar: primeiro na Predialnet (UAIPI), depois semeia no
+// map censurado e atualiza a conta do app. Se a UAIPI falhar, nada local muda.
+const _applyEmailEverywhere = async (user, newEmail) => {
+  await _syncEmailToUAIPI(user.cpf, newEmail);
+  const censoredEmail = Array.from(await censorEmailList([newEmail]))[0] ?? null;
+  await userRepo.updateEmail(user.id, newEmail);
+  return censoredEmail;
+};
+
 // Consulta o e-mail cadastrado da conta do app (com a versão censurada do map).
 const getRegisteredEmail = async ({ cpf }) => {
   const c = String(cpf ?? '').replace(/\D/g, '');
@@ -262,8 +297,8 @@ const getRegisteredEmail = async ({ cpf }) => {
   return { cpf: c, email: user.email, censoredEmail };
 };
 
-// Altera o e-mail da conta do app. Sempre semeia o novo e-mail no map censurado
-// (cria a censura se ainda não existir) para mantê-lo disponível ao fluxo censurado.
+// Altera o e-mail — atualiza a Predialnet (UAIPI, todos os contratos) e a conta
+// do app, semeando no map censurado. Usado pelo suporte (override direto).
 const changeRegisteredEmail = async ({ cpf, email }) => {
   const c = String(cpf ?? '').replace(/\D/g, '');
   if (c.length !== 11) throw new ValidationError('CPF inválido. Informe 11 dígitos.');
@@ -274,9 +309,8 @@ const changeRegisteredEmail = async ({ cpf, email }) => {
   const user = await userRepo.findByCpf(c);
   if (!user) throw new NotFoundError('Conta do app não encontrada para este CPF.');
 
-  const censoredEmail = Array.from(await censorEmailList([newEmail]))[0] ?? null;
-  await userRepo.updateEmail(user.id, newEmail);
-  logger.info('E-mail da conta do app alterado', { cpf: c });
+  const censoredEmail = await _applyEmailEverywhere(user, newEmail);
+  logger.info('E-mail alterado (app + Predialnet)', { cpf: c });
 
   return { message: 'E-mail atualizado com sucesso.', cpf: c, email: newEmail, censoredEmail };
 };
@@ -352,11 +386,11 @@ const confirmEmailChange = async ({ cpf, code }) => {
   }
   if (String(code).trim() !== pending.code) throw new ForbiddenError('Código inválido.');
 
-  const censoredEmail = Array.from(await censorEmailList([pending.newEmail]))[0] ?? null;
-  await userRepo.updateEmail(user.id, pending.newEmail);
+  // Aplica na Predialnet + app. Se a UAIPI falhar, mantém a pendência para retry.
+  const censoredEmail = await _applyEmailEverywhere(user, pending.newEmail);
   await emailChangeRepo.deleteByUserId(user.id);
 
-  logger.info('Troca de e-mail confirmada', { cpf: c });
+  logger.info('Troca de e-mail confirmada (app + Predialnet)', { cpf: c });
   return { message: 'E-mail atualizado com sucesso.', cpf: c, email: pending.newEmail, censoredEmail };
 };
 

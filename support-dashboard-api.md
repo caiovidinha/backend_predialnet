@@ -95,19 +95,21 @@ cliente continua existindo, só perde a conta do app. Operação atômica.
 GET  /support/clients/:cpf/email
 PUT  /support/clients/:cpf/email     Body: { "email": "novo@dominio.com" }
 ```
-Refere-se ao e-mail da **conta do app** (`User.email`), não ao cadastro da UAIPI.
 ```json
 // GET / PUT (200)
 { "cpf": "12345678901", "email": "cliente@dominio.com", "censoredEmail": "c***e@d***o.com" }
 // PUT também retorna: { "message": "E-mail atualizado com sucesso.", ... }
 ```
-- O **PUT semeia o novo e-mail no map censurado** (tabela `Emails`) antes de
-  atualizar — assim ele fica disponível pros fluxos que usam e-mail censurado.
-- `400` e-mail/CPF inválido · `404` conta do app não encontrada.
+- O **PUT atualiza o e-mail em TODOS os lugares**: no cadastro da Predialnet
+  (UAIPI, em todos os contratos do CPF via `set-email`) **e** na conta do app,
+  além de semear no map censurado. Assim o e-mail não diverge (o reset de senha
+  depende disso).
+- `400` e-mail/CPF inválido · `404` conta do app não encontrada · `502` falha ao
+  atualizar na base da Predialnet (nesse caso **nada é alterado** — pode repetir).
 
 > **Suporte = override direto** (sem confirmação). Para o **próprio usuário**
-> (app), a troca é **confirmada por código** (ver abaixo). O suporte não altera
-> nada na base da Predialnet (UAIPI) — só a conta do app.
+> (app), a troca é **confirmada por código** (ver abaixo). Em ambos, o e-mail é
+> sincronizado com o cadastro da Predialnet.
 
 #### Troca pelo próprio usuário (app) — confirmada por código
 Identidade pelo `x-access-token` do usuário (sem passar CPF). Dois passos:
@@ -123,11 +125,43 @@ Identidade pelo `x-access-token` do usuário (sem passar CPF). Dois passos:
    POST /account/email/change-confirm     Body: { "code": "482913" }
    → 200 { "message": "E-mail atualizado com sucesso.", "cpf", "email", "censoredEmail" }
    ```
-   `403` código inválido/expirado · `404` nenhuma troca pendente.
+   `403` código inválido/expirado · `404` nenhuma troca pendente · `502` falha ao
+   atualizar na Predialnet (a pendência é mantida — pode confirmar de novo).
+
+A confirmação atualiza o e-mail **na Predialnet (UAIPI, todos os contratos) e na
+conta do app**, mantendo tudo alinhado.
 
 O código expira em **15 min**; uma pendência por usuário (novo pedido substitui o
 anterior). A confirmação semeia o novo e-mail no map censurado antes de aplicar.
 Consulta continua em `GET /account/email`.
+
+### 3d. Notificações (push) recebidas pelo cliente
+```
+GET /support/clients/:cpf/notifications
+```
+Lista as notificações que o cliente recebeu no app, com data e status de leitura.
+```json
+{
+  "cpf": "12345678901",
+  "total": 12,
+  "unread": 3,
+  "notifications": [
+    {
+      "id": "uuid",
+      "title": "Fatura disponível",
+      "body": "Sua fatura de julho já está disponível.",
+      "data": { "screen": "faturas" },
+      "read": false,
+      "readAt": null,
+      "receivedAt": "2026-07-01T12:00:00.000Z",
+      "sentAt": "2026-07-01T11:59:30.000Z"
+    }
+  ]
+}
+```
+Mais recentes primeiro. `receivedAt` = quando chegou pro cliente; `sentAt` =
+quando a notificação foi criada; `read`/`readAt` = status de leitura.
+`404` se não houver conta do app.
 
 ### 3b. Contratos (números de cliente) de um CPF
 ```
