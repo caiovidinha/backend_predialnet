@@ -18,6 +18,7 @@ const trelloRouter = require('./http/routes/trelloRouter');
 const agendamentoRouter = require('./http/routes/agendamentoRouter');
 const ehClienteRouter = require('./http/routes/ehClienteRouter');
 const testRouter = require('./http/routes/testRouter');
+const speedtestRouter = require('./http/routes/speedtestRouter');
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use('/messages', messagesRouter);
 app.use('/trello', trelloRouter);
 app.use('/agendamento', agendamentoRouter);
 app.use('/test', testRouter);
+app.use('/speedtest', speedtestRouter);
 app.use('/', ehClienteRouter);
 
 app.get('/docs', swaggerAuthMiddleware, (req, res, next) => {
