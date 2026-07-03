@@ -26,4 +26,12 @@ const validateJWT = (req, res, next) => {
   });
 };
 
-module.exports = { validateJWT };
+// Restringe a rota ao dashboard do operador (ADMIN_BYPASS_TOKEN).
+// Em ambientes sem JWT (ENABLE_JWT != 'true') libera, para dev.
+const requireAdmin = (req, res, next) => {
+  if (!jwtEnabled()) return next();
+  if (req.userId === 'admin-dashboard') return next();
+  return res.status(403).end();
+};
+
+module.exports = { validateJWT, requireAdmin };

@@ -160,3 +160,64 @@ model ClientAddress {
   @@index([cep])
   @@map("client_addresses")
 }
+
+// ─── Speedtest nativo ────────────────────────────────────────────────────────
+// Um registro por teste concluído/abortado no app. O app mede no cliente
+// (src/speedtest/engine.ts) e envia o resultado detalhado para POST /speedtest/result.
+
+model SpeedTest {
+  id     String  @id @default(uuid())
+
+  // Identificação do cliente (do JWT, quando autenticado)
+  userId String?
+  cpf    String?
+
+  // Resultados principais
+  downloadMbps Float? // vazão de download (Mbit/s)
+  uploadMbps   Float? // vazão de upload (Mbit/s)
+  pingMs       Float? // latência média (ms)
+  jitterMs     Float? // variação da latência (ms)
+  packetLoss   Float? // perda de pacotes (0-100 %), se medida
+
+  // Fase de download
+  downloadBytes       Float? // bytes transferidos na janela de medição
+  downloadDurationMs  Int?   // duração efetiva da medição de download
+  downloadConnections Int?   // conexões paralelas usadas
+
+  // Fase de upload
+  uploadBytes       Float?
+  uploadDurationMs  Int?
+  uploadConnections Int?
+
+  // Ping
+  pingSamplesCount Int?
+  pingSamples      Json? // array bruto de amostras (ms)
+
+  // Contexto do cliente / dispositivo
+  appVersion     String?
+  platform       String? // ios | android | web
+  osVersion      String?
+  deviceModel    String?
+  connectionType String? // wifi | cellular | ethernet | unknown
+  carrier        String? // operadora móvel, quando aplicável
+
+  // Contexto capturado no servidor
+  clientIp   String?
+  userAgent  String? @db.Text
+  serverHost String? // base URL do speedtest usada pelo app
+
+  // Metadados de execução
+  status       String    @default("completed") // completed | aborted | error
+  errorMessage String?   @db.Text
+  config       Json?     // DEFAULT_CONFIG efetivo usado no teste
+  raw          Json?     // payload extra do engine, para não perder nada
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([cpf])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([cpf, createdAt])
+  @@map("speed_tests")
+}
