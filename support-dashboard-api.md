@@ -31,8 +31,9 @@ login do painel atual (Alertas/Push).
   consultas via base da Predialnet (UAIPI).
 - **`cpf`** — CPF do cliente (chave da conta do app na base local).
 - **`codcliente`** — código do contrato na Predialnet. **Faturas, status e
-  libtemp são por contrato** — um CPF pode ter vários `codcliente`. Pegue os
-  contratos no `account`/`overview` e consulte esses endpoints por contrato.
+  libtemp são por contrato** — um CPF pode ter vários `codcliente`. Liste os
+  contratos em `GET /support/clients/:credential/contracts`, o operador
+  seleciona um, e aí você consulta `status`/`invoices`/`libtemp` por contrato.
 
 ---
 
@@ -71,6 +72,40 @@ GET /support/clients/:cpf/app-account
 { "exists": true, "cpf": "12345678901", "userId": "uuid", "email": "f@x.com", "mustChangePassword": false }
 ```
 Não existe: `{ "exists": false, "cpf": "12345678901" }`. CPF inválido → `400`.
+
+### 3b. Contratos (números de cliente) de um CPF
+```
+GET /support/clients/:credential/contracts
+```
+Lista os contratos do CPF para o operador **selecionar um** e então consultar
+`status`, `invoices` e `libtemp` daquele `codcliente`.
+```json
+{
+  "isClient": true,
+  "cpf": "12345678901",
+  "nome": "Fulano",
+  "total": 2,
+  "contratos": [
+    {
+      "codcliente": "55501",
+      "inscricao": "12345678901",
+      "nome": "Fulano",
+      "email": "f@x.com",
+      "endereco": { "cidade": "Rio", "bairro": "Centro", "cep": "20000000", "numero": "123" },
+      "serpontos": [ /* ... */ ],
+      "cliente": { /* objeto cru completo do contrato */ }
+    }
+  ]
+}
+```
+Se não for cliente: `{ "isClient": false, "contratos": [] }`.
+
+> ⚠️ **Confirmar o campo do `codcliente`:** o backend tenta detectá-lo por
+> heurística (`codcliente` / `codigo` / `cod_cliente` / `cod` / `contrato`) e
+> **nunca** usa `numero` (que é o número do endereço). Se o campo real na UAIPI
+> tiver outro nome, o `codcliente` pode vir `null` — nesse caso, leia o
+> identificador de `contratos[].cliente` (objeto cru). **Me confirme o nome do
+> campo** para eu fixar corretamente.
 
 ### 4. Dados cadastrais completos (UAIPI)
 ```

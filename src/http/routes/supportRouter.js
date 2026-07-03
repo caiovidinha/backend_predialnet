@@ -66,6 +66,23 @@ router.get('/clients/:cpf/app-account', ctrl.appAccount);
 
 /**
  * @swagger
+ * /support/clients/{credential}/contracts:
+ *   get:
+ *     summary: Lista os contratos (números de cliente) de um CPF
+ *     tags: [Support]
+ *     parameters:
+ *       - in: path
+ *         name: credential
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: "{ isClient, cpf, nome, total, contratos[] } — cada contrato traz codcliente, endereço, serpontos e o objeto cru"
+ */
+router.get('/clients/:credential/contracts', ctrl.contracts);
+
+/**
+ * @swagger
  * /support/clients/{credential}/account:
  *   get:
  *     summary: Dados cadastrais completos do cliente (UAIPI)

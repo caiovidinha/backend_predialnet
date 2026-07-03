@@ -34,6 +34,16 @@ const isClient = async (req, res) => {
   }
 };
 
+const contracts = async (req, res) => {
+  try {
+    const result = await supportService.getContracts(req.params.credential);
+    return res.status(200).json(result);
+  } catch (err) {
+    logger.error('support contracts error', { error: err.message });
+    return res.status(errStatus(err)).json({ error: err.message });
+  }
+};
+
 const account = async (req, res) => {
   try {
     const result = await supportService.getAccount(req.params.credential);
@@ -151,6 +161,7 @@ module.exports = {
   overview,
   appAccount,
   isClient,
+  contracts,
   account,
   status,
   invoices,
