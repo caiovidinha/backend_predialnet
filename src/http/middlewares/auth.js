@@ -34,4 +34,24 @@ const requireAdmin = (req, res, next) => {
   return res.status(403).end();
 };
 
-module.exports = { validateJWT, requireAdmin };
+// Best-effort: decodifica o x-access-token e popula req.userId/req.cpf quando
+// possível, INDEPENDENTE de ENABLE_JWT. Não rejeita: token ausente/inválido/
+// expirado apenas segue sem identidade (registro anônimo). Usado para amarrar
+// submissões (ex.: speedtest) ao cliente sem exigir o flag global de auth.
+const attachClientIdentity = async (req, res, next) => {
+  const token = req.headers['x-access-token'];
+  if (!token || token === process.env.ADMIN_BYPASS_TOKEN) return next();
+
+  try {
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    req.userId = decoded.userId;
+    const user = await userRepo.findById(decoded.userId);
+    req.cpf = user ? user.cpf : null;
+  } catch {
+    // token inválido/expirado: segue sem identidade
+  }
+
+  return next();
+};
+
+module.exports = { validateJWT, requireAdmin, attachClientIdentity };

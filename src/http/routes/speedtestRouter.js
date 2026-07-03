@@ -1,5 +1,5 @@
 const express = require('express');
-const { validateJWT, requireAdmin } = require('../middlewares/auth');
+const { validateJWT, requireAdmin, attachClientIdentity } = require('../middlewares/auth');
 const {
   download,
   upload,
@@ -89,9 +89,11 @@ router.get('/ping', ping);
  *     summary: Persiste o resultado detalhado de um teste (medido no cliente)
  *     tags: [Speedtest]
  *     description: >
- *       Autenticado com x-access-token do cliente. Aceita payload achatado ou
- *       aninhado (download/upload/ping/device). userId, cpf, IP e user-agent são
- *       capturados no servidor. Campos desconhecidos são preservados em `raw`.
+ *       Envie o x-access-token do cliente para amarrar o teste ao cliente
+ *       (userId/cpf são resolvidos a partir do token, independente de ENABLE_JWT).
+ *       Sem token válido, o teste é gravado como anônimo. Aceita payload achatado
+ *       ou aninhado (download/upload/ping/device). IP e user-agent são capturados
+ *       no servidor. Campos desconhecidos são preservados em `raw`.
  *     requestBody:
  *       required: true
  *       content:
@@ -141,10 +143,8 @@ router.get('/ping', ping);
  *         description: Resultado salvo
  *       400:
  *         description: Payload inválido
- *       401:
- *         description: Não autenticado
  */
-router.post('/result', validateJWT, submitResult);
+router.post('/result', attachClientIdentity, submitResult);
 
 // ── Consulta pelo operador (admin) ───────────────────────────────────────────
 
