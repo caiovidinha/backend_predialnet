@@ -46,16 +46,22 @@ const isClient = async (credential) => {
 // Dados completos do cliente (contratos, endereço, serpontos, plano...).
 const getAccount = (credential) => utilitiesService.getClientData(credential);
 
-// Descobre o identificador de contrato (codcliente) dentro do objeto da UAIPI.
-// NÃO usa `numero` (é o número do endereço). O objeto cru vai junto no retorno
-// para o front ler o campo correto caso o nome real difira destes candidatos.
-const CODCLIENTE_KEYS = ['codcliente', 'codigo', 'cod_cliente', 'cod', 'contrato'];
-const pickCodcliente = (cliente) => {
-  for (const k of CODCLIENTE_KEYS) {
-    if (cliente?.[k] != null && cliente[k] !== '') return String(cliente[k]);
-  }
+// O identificador de contrato (codcliente) é `cliente.id` na UAIPI — é o que vai
+// para /faturas/:id, /clientes/:id, libtemp, etc.
+const pickCodcliente = (c) => {
+  if (c?.id != null) return String(c.id);
+  if (c?.codcliente != null) return String(c.codcliente);
   return null;
 };
+
+// Resumo por serponto (ponto de serviço): status de conexão e plano.
+const mapPlanos = (serpontos = []) =>
+  serpontos.map((sp) => ({
+    serponto_id: sp.id ?? null,
+    status: sp.dados_conexao?.status ?? null,
+    plano: sp.plano?.plano_apelido ?? null,
+    velocidade: sp.plano ? `${sp.plano.velocidade ?? ''} ${sp.plano.unidade ?? ''}`.trim() : null,
+  }));
 
 // Lista os contratos (números de cliente) de um CPF, para o operador escolher
 // um e então consultar status/faturas/libtemp daquele contrato específico.
@@ -65,18 +71,24 @@ const getContracts = async (credential) => {
 
   const contratos = cliente.users.map((u) => {
     const c = u.cliente ?? {};
+    const e = c.endereco ?? {};
     return {
       codcliente: pickCodcliente(c),
       inscricao: c.inscricao ?? null,
       nome: c.nome ?? null,
       email: c.email ?? null,
+      situacao: c.situacao ?? null,
+      permiteLiberacao: c.permite_liberacao ?? null,
       endereco: {
-        cidade: c.cidade ?? null,
-        bairro: c.bairro ?? null,
-        cep: c.cep ?? null,
-        numero: c.numero ?? null,
+        logradouro: e.endereco ?? null,
+        numero: e.numero ?? null,
+        complemento: e.complemento ?? null,
+        bairro: e.bairro ?? null,
+        cidade: e.cidade ?? null,
+        uf: e.uf ?? null,
+        cep: e.cep ?? null,
       },
-      serpontos: c.serpontos ?? [],
+      planos: mapPlanos(c.serpontos),
       cliente: c, // objeto cru completo do contrato
     };
   });

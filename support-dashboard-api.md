@@ -52,8 +52,8 @@ Resiliente: cada parte falha isoladamente (campo vem `null`), sem derrubar o res
   "account": { "cliente": { /* objeto completo da UAIPI: contratos, endereço, serpontos, plano... */ } }
 }
 ```
-Use o `account.cliente` para extrair os `codcliente`/serpontos e então chamar
-`status`, `invoices` e `libtemp` por contrato.
+Para os contratos/codcliente, prefira o endpoint `contracts` abaixo (mais limpo).
+O `codcliente` é o `cliente.id` da UAIPI.
 
 ### 2. É cliente Predialnet?
 ```
@@ -78,34 +78,38 @@ Não existe: `{ "exists": false, "cpf": "12345678901" }`. CPF inválido → `400
 GET /support/clients/:credential/contracts
 ```
 Lista os contratos do CPF para o operador **selecionar um** e então consultar
-`status`, `invoices` e `libtemp` daquele `codcliente`.
+`status`, `invoices` e `libtemp` daquele `codcliente` (= `cliente.id` na UAIPI).
 ```json
 {
   "isClient": true,
-  "cpf": "12345678901",
-  "nome": "Fulano",
-  "total": 2,
+  "cpf": "02227913738",
+  "nome": "Fulano de Souza",
+  "total": 1,
   "contratos": [
     {
-      "codcliente": "55501",
-      "inscricao": "12345678901",
-      "nome": "Fulano",
-      "email": "f@x.com",
-      "endereco": { "cidade": "Rio", "bairro": "Centro", "cep": "20000000", "numero": "123" },
-      "serpontos": [ /* ... */ ],
-      "cliente": { /* objeto cru completo do contrato */ }
+      "codcliente": "157175",
+      "inscricao": "02227913738",
+      "nome": "Fulano de Souza",
+      "email": "fulano@x.com",
+      "situacao": "Ativo",
+      "permiteLiberacao": false,
+      "endereco": {
+        "logradouro": "Ator Paulo Gustavo", "numero": "264", "complemento": "207",
+        "bairro": "Icaraí", "cidade": "Niterói", "uf": "RJ", "cep": "24230063"
+      },
+      "planos": [
+        { "serponto_id": 239328, "status": "Conectado", "plano": "Oferta Predial 800", "velocidade": "800 Mb" }
+      ],
+      "cliente": { /* objeto cru completo do contrato (UAIPI) */ }
     }
   ]
 }
 ```
 Se não for cliente: `{ "isClient": false, "contratos": [] }`.
 
-> ⚠️ **Confirmar o campo do `codcliente`:** o backend tenta detectá-lo por
-> heurística (`codcliente` / `codigo` / `cod_cliente` / `cod` / `contrato`) e
-> **nunca** usa `numero` (que é o número do endereço). Se o campo real na UAIPI
-> tiver outro nome, o `codcliente` pode vir `null` — nesse caso, leia o
-> identificador de `contratos[].cliente` (objeto cru). **Me confirme o nome do
-> campo** para eu fixar corretamente.
+Use `contratos[].codcliente` (é o `cliente.id`) para chamar `status`, `invoices`
+e `libtemp`. O `planos[]` já traz status de conexão e plano por serponto — bom
+para o seletor de contrato.
 
 ### 4. Dados cadastrais completos (UAIPI)
 ```
@@ -121,9 +125,9 @@ GET /support/clients/:codcliente/status
 ```json
 {
   "service_status": [
-    { "id_ponto": 123, "status_conexao": "Conectado", "velocidade": "500 MB" }
+    { "id_ponto": 239328, "status_conexao": "Conectado", "velocidade": "800 Mb" }
   ],
-  "payment_status": { "status": "em aberto", "valor": "99.90", "vencimento": "10/07/2026" },
+  "payment_status": { "status": "em aberto", "valor": "124.90", "vencimento": "25/06/2026" },
   "libtemp_status": false
 }
 ```
@@ -141,8 +145,11 @@ GET /support/clients/:codcliente/invoices
 ```
 `status` da fatura atual pode ser `"paga" | "em aberto" | "atrasada"`.
 
-Cada fatura em `history` traz os campos da UAIPI: `tipo`, `valor`, `data_emissao`,
-`dta_vencimento`, `dta_pagamento`, `boleta`, `link`, `pix`, `cancelada`, etc.
+Cada fatura em `history` traz os campos reais da UAIPI: `boleta`, `tipo`
+(`"internet"`), `valor` (string, ex. `"124.90"`), `dta_vencimento`,
+`dta_venc_original`, `dta_pagamento` (null se em aberto), `cancelada` (bool),
+`pix` (copia-e-cola), `link` (PDF do boleto), `processado`, `nf_id`, `svanf_id`.
+Não há `data_emissao`.
 
 ### 7. Fatura atual + outras pendentes
 ```
@@ -156,7 +163,10 @@ GET /support/clients/:codcliente/invoices/current
 ```
 GET /support/clients/:codcliente/libtemp
 ```
-Retorna a situação da liberação temporária do contrato.
+Retorna a situação da liberação temporária do contrato. **`404` = cliente sem
+liberação ativa** (trate como estado normal, não como erro). Note também
+`permiteLiberacao` (do `contracts`): se `false`, o cliente não pode receber
+liberação temporária.
 
 ---
 
