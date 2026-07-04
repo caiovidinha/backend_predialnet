@@ -1,38 +1,41 @@
-# Chamados de Suporte (Kanban) — Contrato da API
+# Chamados de Suporte (Kanban) — API
 
-Base do backend para o painel de suporte gerenciar **chamados/tickets** em um
-board estilo kanban, com abertura, comentários e **notificação por e-mail** ao
-suporte quando um chamado é aberto.
+Instruções para o front do painel de suporte consumir a API de **chamados**
+(board kanban), com abertura, comentários e anexos.
 
-- **Base URL:** `NEXT_PUBLIC_API_URL` → produção `https://appgw.predialnet.com.br`
+- **Base URL:** `https://appgw.predialnet.com.br` (via `NEXT_PUBLIC_API_URL`)
 - **Prefixo:** `/tickets`
-- **Autenticação:** todas as rotas exigem `x-access-token: <ADMIN_BYPASS_TOKEN>`
-  (mesmo do resto do painel). `401` sem token, `403` não-admin.
+- **Autenticação:** todas as rotas exigem o header `x-access-token` com o token
+  de operador do painel (o mesmo usado nas outras telas). `401` sem token,
+  `403` sem permissão.
+- **Erros:** sempre no formato `{ "error": "mensagem" }` com o status HTTP
+  apropriado (mensagem exibível ao operador).
 
 ## Colunas (status) e prioridades
 - **status** (colunas do kanban): `ABERTO` · `EM_ANDAMENTO` · `AGUARDANDO` ·
   `RESOLVIDO` · `FECHADO`
 - **priority:** `BAIXA` · `MEDIA` · `ALTA` · `URGENTE`
 
-## Modelo do chamado
+## Modelos
 ```ts
 type Ticket = {
   id: string;
-  number: number;         // nº sequencial do chamado (#1, #2, …)
+  number: number;               // nº sequencial do chamado (#1, #2, …)
   subject: string;
   description: string;
   status: TicketStatus;
   priority: TicketPriority;
   category: string | null;
-  position: number;       // ordem dentro da coluna (kanban)
+  position: number;             // ordem dentro da coluna (kanban)
   requesterName: string | null; // operador que abriu o chamado
   cpf: string | null;           // cliente relacionado (dados vêm da API via CPF)
   codcliente: string | null;    // contrato (opcional)
-  assignee: string | null;
-  closedAt: string | null; // setado ao entrar em RESOLVIDO/FECHADO
+  assignee: string | null;      // responsável
+  closedAt: string | null;      // preenchido ao entrar em RESOLVIDO/FECHADO
   createdAt: string;
   updatedAt: string;
-  comments?: TicketComment[]; // só no detalhe
+  comments?: TicketComment[];        // só no detalhe
+  attachments?: TicketAttachment[];  // só no detalhe
 };
 
 type TicketComment = {
@@ -42,11 +45,21 @@ type TicketComment = {
   internal: boolean;  // comentário interno (não mostrar ao cliente)
   createdAt: string;
 };
+
+type TicketAttachment = {
+  id: string;
+  ticketId: string;
+  filename: string;
+  mimeType: string | null;
+  size: number | null;   // bytes
+  uploadedBy: string | null;
+  createdAt: string;
+};
 ```
 
 ## Endpoints
 
-### Abrir chamado (operador → suporte) — dispara e-mail
+### Abrir chamado
 ```
 POST /tickets
 Body: {
@@ -61,17 +74,15 @@ Body: {
 }
 → 201 Ticket
 ```
-O chamado é aberto **pelo operador para o suporte**. Do cliente basta o `cpf`
-(e opcionalmente `codcliente`) — o resto dos dados o painel puxa da API
-(`/support/clients/:credential/overview`, `.../contracts`).
-Ao criar, envia e-mail de notificação para `SUPPORT_NOTIFY_EMAIL`
-(padrão `caiomdavidinha@gmail.com`), best-effort. `400` se faltar
-subject/description.
+Do cliente basta o `cpf` (e opcionalmente `codcliente`) — o resto dos dados o
+painel busca nos endpoints de suporte (`/support/clients/:credential/overview`,
+`.../contracts`). A abertura dispara uma **notificação por e-mail** ao suporte.
+`400` se faltar `subject`/`description`.
 
 ### Board kanban
 ```
 GET /tickets/board
-→ 200 { "columns": [ { "status": "ABERTO", "tickets": [Ticket, …] }, … ], "total": N }
+→ 200 { "columns": [ { "status": "ABERTO", "tickets": Ticket[] }, … ], "total": N }
 ```
 Retorna **todas as 5 colunas** (mesmo vazias), cada uma com seus chamados
 ordenados por `position` e depois `createdAt`. Ideal pra renderizar o board.
@@ -81,11 +92,11 @@ ordenados por `position` e depois `createdAt`. Ideal pra renderizar o board.
 GET /tickets?status=&priority=&assignee=&cpf=&q=&page=1&limit=20
 → 200 { items: Ticket[], total, page, limit }
 ```
-`q` busca em assunto/descrição/nome/e-mail do solicitante. `limit` máx. 100.
+`q` busca em assunto, descrição, nome de quem abriu e CPF. `limit` máx. 100.
 
-### Detalhe (com comentários)
+### Detalhe (com comentários e anexos)
 ```
-GET /tickets/:id  → 200 Ticket (com comments[])  ·  404 se não achar
+GET /tickets/:id  → 200 Ticket (com comments[] e attachments[])  ·  404 se não achar
 ```
 
 ### Atualizar / mover no kanban
@@ -109,41 +120,27 @@ POST /tickets/:id/comments
 Body: { "body": "Retornei o contato", "author": "operador1", "internal": true }
 → 201 TicketComment
 ```
-`internal: true` = comentário interno (não exibir ao cliente). `400` sem body.
+`internal: true` = comentário interno (não exibir ao cliente). `400` sem `body`.
 
-### Remover (soft delete)
+### Remover chamado
 ```
 DELETE /tickets/:id  → 200 { "deleted": true, "id" }
 ```
-Marca `deleted_at`; some das listagens e do board (não apaga do banco).
+Some das listagens e do board.
 
-## Anexos (object storage)
+## Anexos
 
-Os arquivos vão para um bucket S3-compatível; o backend guarda só os metadados
-e gera **URLs temporárias assinadas** para download (o front não passa o arquivo
-pelo servidor no download). `storageKey` nunca é exposto.
+Os arquivos são enviados via multipart e o download é feito por uma **URL
+temporária** que a API devolve (o arquivo não passa pelo painel no download).
 
-```ts
-type TicketAttachment = {
-  id: string;
-  ticketId: string;
-  filename: string;
-  mimeType: string | null;
-  size: number | null;
-  uploadedBy: string | null;
-  createdAt: string;
-};
-```
-
-### Anexar arquivo (multipart)
+### Anexar arquivo
 ```
 POST /tickets/:id/attachments      (multipart/form-data)
-  file: <binário>        // obrigatório, campo "file"
-  uploadedBy: "operador1" // opcional
+  file: <binário>          // obrigatório, campo "file"
+  uploadedBy: "operador1"  // opcional
 → 201 TicketAttachment
 ```
-`400` sem arquivo · `413` acima do limite (`TICKET_MAX_UPLOAD_MB`, padrão 25 MB)
-· `503` storage não configurado no servidor.
+`400` sem arquivo · `413` acima do limite (**25 MB** por arquivo).
 
 ### Listar anexos
 ```
@@ -151,65 +148,47 @@ GET /tickets/:id/attachments  → 200 { items: TicketAttachment[] }
 ```
 (Também vêm no detalhe do chamado, em `attachments[]`.)
 
-### Baixar (URL temporária assinada)
+### Baixar (URL temporária)
 ```
 GET /tickets/:id/attachments/:attId/url
 → 200 { "url": "https://…", "expiresIn": 300, "filename": "print.png" }
 ```
-O front usa essa `url` direto (expira em `S3_URL_TTL_SEC`, padrão 300s).
+Use a `url` diretamente. Ela **expira em ~5 min** — gere na hora do clique, não
+guarde. `404` se o anexo não existir.
 
 ### Remover anexo
 ```
 DELETE /tickets/:id/attachments/:attId  → 200 { "deleted": true, "id" }
 ```
-Remove do bucket **e** do banco.
 
-### Exemplo no front (anexos)
+### Exemplo (upload e download)
 ```js
-// Upload (multipart) — campo "file"
+// Upload — campo "file"
 const fd = new FormData();
 fd.append('file', file);            // File do input
 fd.append('uploadedBy', operador);  // opcional
 await fetch(`${API}/tickets/${id}/attachments`, {
   method: 'POST',
-  headers: { 'x-access-token': adminToken }, // NÃO setar Content-Type: o browser cuida do boundary
+  headers: { 'x-access-token': token }, // NÃO setar Content-Type: o browser cuida do boundary
   body: fd,
 });
 
-// Download — pega a URL assinada e abre/baixa
+// Download — pega a URL temporária e abre/baixa
 const { url } = await fetch(
   `${API}/tickets/${id}/attachments/${attId}/url`,
-  { headers: { 'x-access-token': adminToken } },
+  { headers: { 'x-access-token': token } },
 ).then(r => r.json());
 window.open(url); // ou <a href={url} download>
 ```
-> A `url` de download expira em ~5 min (`S3_URL_TTL_SEC`). Gere-a na hora do
-> clique, não guarde. Storage já configurado (Cloudflare R2) no backend.
 
-## Sugestão de telas (front)
+## Sugestão de telas
 1. **Board kanban** (`GET /tickets/board`): 5 colunas, cards com `#number`,
-   assunto, prioridade (cor), responsável, tempo. Drag & drop → `PATCH` com
+   assunto, prioridade (cor), responsável e tempo. Drag & drop → `PATCH` com
    `status` (e `position`).
 2. **Novo chamado** (form): `POST /tickets` — assunto, descrição, prioridade,
-   categoria, dados do solicitante (nome/e-mail/telefone) e, se aplicável,
-   `cpf`/`codcliente` (pode vir do fluxo de busca de cliente do painel).
-3. **Detalhe** (`GET /tickets/:id`): dados + thread de comentários; adicionar
-   andamento (`POST .../comments`), com toggle "interno".
+   categoria, quem abriu (`requesterName`) e, se aplicável, `cpf`/`codcliente`
+   (pode vir do fluxo de busca de cliente do painel). Suporta anexos.
+3. **Detalhe** (`GET /tickets/:id`): dados do chamado, thread de comentários
+   (com toggle "interno") e anexos (upload/baixar/remover).
 4. **Lista/busca** (`GET /tickets`): filtros por status/prioridade/responsável/
    CPF e busca textual.
-
-## Config de deploy
-- **Migrations novas** (`tickets`, `ticket_comments`, `ticket_attachments`):
-  `npm run migrate` + `npx prisma generate` + restart.
-- **`SUPPORT_NOTIFY_EMAIL`** (opcional): destino da notificação de novo chamado.
-  Sem ela, usa `caiomdavidinha@gmail.com`.
-- **Object storage (anexos)** — env S3-compatível (funciona com AWS S3, DO
-  Spaces, Cloudflare R2, Backblaze B2, MinIO):
-  - `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (obrigatórios p/ anexos)
-  - `S3_REGION` (padrão `us-east-1`)
-  - `S3_ENDPOINT` (para provedores não-AWS, ex. `https://<region>.digitaloceanspaces.com`)
-  - `S3_FORCE_PATH_STYLE=true` (MinIO e alguns provedores)
-  - `S3_URL_TTL_SEC` (validade da URL de download, padrão 300)
-  - `TICKET_MAX_UPLOAD_MB` (limite por arquivo, padrão 25)
-  - Sem essas envs, os chamados funcionam normalmente; só o upload de anexo
-    responde `503`.
