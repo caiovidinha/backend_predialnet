@@ -164,6 +164,28 @@ DELETE /tickets/:id/attachments/:attId  → 200 { "deleted": true, "id" }
 ```
 Remove do bucket **e** do banco.
 
+### Exemplo no front (anexos)
+```js
+// Upload (multipart) — campo "file"
+const fd = new FormData();
+fd.append('file', file);            // File do input
+fd.append('uploadedBy', operador);  // opcional
+await fetch(`${API}/tickets/${id}/attachments`, {
+  method: 'POST',
+  headers: { 'x-access-token': adminToken }, // NÃO setar Content-Type: o browser cuida do boundary
+  body: fd,
+});
+
+// Download — pega a URL assinada e abre/baixa
+const { url } = await fetch(
+  `${API}/tickets/${id}/attachments/${attId}/url`,
+  { headers: { 'x-access-token': adminToken } },
+).then(r => r.json());
+window.open(url); // ou <a href={url} download>
+```
+> A `url` de download expira em ~5 min (`S3_URL_TTL_SEC`). Gere-a na hora do
+> clique, não guarde. Storage já configurado (Cloudflare R2) no backend.
+
 ## Sugestão de telas (front)
 1. **Board kanban** (`GET /tickets/board`): 5 colunas, cards com `#number`,
    assunto, prioridade (cor), responsável, tempo. Drag & drop → `PATCH` com
