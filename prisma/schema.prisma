@@ -165,12 +165,28 @@ model Ticket {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  comments TicketComment[]
+  comments    TicketComment[]
+  attachments TicketAttachment[]
 
   @@index([status])
   @@index([cpf])
   @@index([createdAt])
   @@map("tickets")
+}
+
+model TicketAttachment {
+  id         String   @id @default(uuid())
+  ticket     Ticket   @relation(fields: [ticketId], references: [id])
+  ticketId   String
+  filename   String
+  mimeType   String?
+  size       Int?
+  storageKey String // chave do objeto no bucket
+  uploadedBy String?
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("ticket_attachments")
 }
 
 model TicketComment {

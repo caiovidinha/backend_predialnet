@@ -86,4 +86,45 @@ const remove = async (req, res) => {
   }
 };
 
-module.exports = { create, list, board, get, update, comment, remove };
+const uploadAttachment = async (req, res) => {
+  try {
+    const att = await ticketService.addAttachment(req.params.id, req.file, req.body.uploadedBy);
+    return res.status(201).json(att);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    logger.error('ticket attachment upload error', { error: err.message });
+    return res.status(500).json({ error: 'Erro ao anexar arquivo.' });
+  }
+};
+
+const listAttachments = async (req, res) => {
+  try {
+    const items = await ticketService.listAttachments(req.params.id);
+    return res.status(200).json({ items });
+  } catch (err) {
+    return res.status(errStatus(err)).json({ error: err.message });
+  }
+};
+
+const attachmentUrl = async (req, res) => {
+  try {
+    const result = await ticketService.getAttachmentUrl(req.params.attId);
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(errStatus(err)).json({ error: err.message });
+  }
+};
+
+const deleteAttachment = async (req, res) => {
+  try {
+    const result = await ticketService.deleteAttachment(req.params.attId);
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(errStatus(err)).json({ error: err.message });
+  }
+};
+
+module.exports = {
+  create, list, board, get, update, comment, remove,
+  uploadAttachment, listAttachments, attachmentUrl, deleteAttachment,
+};

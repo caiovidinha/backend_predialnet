@@ -1,7 +1,9 @@
+const crypto = require('crypto');
 const ticketRepo = require('../../infrastructure/repositories/ticketRepository');
 const uaipi = require('../../infrastructure/external/uaipiClient');
+const storage = require('../../infrastructure/storage/objectStorage');
 const logger = require('../../utils/logger');
-const { ValidationError, NotFoundError } = require('../../domain/errors/AppError');
+const { ValidationError, NotFoundError, AppError } = require('../../domain/errors/AppError');
 
 const STATUSES = ['ABERTO', 'EM_ANDAMENTO', 'AGUARDANDO', 'RESOLVIDO', 'FECHADO'];
 const PRIORITIES = ['BAIXA', 'MEDIA', 'ALTA', 'URGENTE'];
@@ -84,6 +86,8 @@ async function getBoard() {
 async function getTicket(id) {
   const ticket = await ticketRepo.findById(id);
   if (!ticket) throw new NotFoundError('Chamado não encontrado.');
+  // Não expõe storageKey dos anexos.
+  if (ticket.attachments) ticket.attachments = ticket.attachments.map(_publicAttachment);
   return ticket;
 }
 
@@ -138,6 +142,77 @@ async function deleteTicket(id) {
   return { deleted: true, id };
 }
 
+// ── Anexos (object storage S3-compatível) ────────────────────────────────────
+
+const sanitizeName = (name) => String(name || 'arquivo').replace(/[^\w.\-]+/g, '_').slice(0, 120);
+
+async function addAttachment(ticketId, file, uploadedBy) {
+  if (!storage.isConfigured())
+    throw new AppError('Armazenamento de anexos não configurado no servidor.', 503);
+  if (!file || !file.buffer) throw new ValidationError('Arquivo (file) é obrigatório.');
+
+  const ticket = await ticketRepo.findById(ticketId);
+  if (!ticket) throw new NotFoundError('Chamado não encontrado.');
+
+  const filename = sanitizeName(file.originalname);
+  const key = `tickets/${ticketId}/${crypto.randomUUID()}-${filename}`;
+  await storage.putObject(key, file.buffer, file.mimetype);
+
+  const attachment = await ticketRepo.addAttachment(ticketId, {
+    filename,
+    mimeType: file.mimetype || null,
+    size: file.size ?? file.buffer.length,
+    storageKey: key,
+    uploadedBy: uploadedBy ? String(uploadedBy).slice(0, 191) : null,
+  });
+  logger.info('Anexo adicionado ao chamado', { ticketId, attachmentId: attachment.id });
+  return _publicAttachment(attachment);
+}
+
+async function listAttachments(ticketId) {
+  const ticket = await ticketRepo.findById(ticketId);
+  if (!ticket) throw new NotFoundError('Chamado não encontrado.');
+  const rows = await ticketRepo.findAttachments(ticketId);
+  return rows.map(_publicAttachment);
+}
+
+// URL temporária para baixar o anexo.
+async function getAttachmentUrl(attachmentId) {
+  if (!storage.isConfigured())
+    throw new AppError('Armazenamento de anexos não configurado no servidor.', 503);
+  const att = await ticketRepo.findAttachment(attachmentId);
+  if (!att) throw new NotFoundError('Anexo não encontrado.');
+  const url = await storage.getDownloadUrl(att.storageKey, att.filename);
+  return { url, expiresIn: storage.URL_TTL, filename: att.filename };
+}
+
+async function deleteAttachment(attachmentId) {
+  const att = await ticketRepo.findAttachment(attachmentId);
+  if (!att) throw new NotFoundError('Anexo não encontrado.');
+  if (storage.isConfigured()) {
+    try {
+      await storage.deleteObject(att.storageKey);
+    } catch (err) {
+      logger.warn('Falha ao remover objeto do storage', { attachmentId, error: err.message });
+    }
+  }
+  await ticketRepo.deleteAttachment(attachmentId);
+  return { deleted: true, id: attachmentId };
+}
+
+// Nunca expõe a storageKey diretamente ao cliente.
+function _publicAttachment(a) {
+  return {
+    id: a.id,
+    ticketId: a.ticketId,
+    filename: a.filename,
+    mimeType: a.mimeType,
+    size: a.size,
+    uploadedBy: a.uploadedBy,
+    createdAt: a.createdAt,
+  };
+}
+
 module.exports = {
   createTicket,
   listTickets,
@@ -146,6 +221,10 @@ module.exports = {
   updateTicket,
   addComment,
   deleteTicket,
+  addAttachment,
+  listAttachments,
+  getAttachmentUrl,
+  deleteAttachment,
   STATUSES,
   PRIORITIES,
 };

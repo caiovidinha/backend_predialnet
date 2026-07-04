@@ -43,7 +43,10 @@ const findAllActive = () =>
 const findById = (id) =>
   client.ticket.findFirst({
     where: { id, deleted_at: null },
-    include: { comments: { orderBy: { createdAt: 'asc' } } },
+    include: {
+      comments: { orderBy: { createdAt: 'asc' } },
+      attachments: { orderBy: { createdAt: 'asc' } },
+    },
   });
 
 const update = (id, data) => client.ticket.update({ where: { id }, data });
@@ -54,4 +57,17 @@ const softDelete = (id) =>
 const addComment = (ticketId, { author, body, internal = false }) =>
   client.ticketComment.create({ data: { ticketId, author, body, internal } });
 
-module.exports = { create, list, findAllActive, findById, update, softDelete, addComment };
+const addAttachment = (ticketId, data) =>
+  client.ticketAttachment.create({ data: { ticketId, ...data } });
+
+const findAttachments = (ticketId) =>
+  client.ticketAttachment.findMany({ where: { ticketId }, orderBy: { createdAt: 'asc' } });
+
+const findAttachment = (id) => client.ticketAttachment.findUnique({ where: { id } });
+
+const deleteAttachment = (id) => client.ticketAttachment.delete({ where: { id } });
+
+module.exports = {
+  create, list, findAllActive, findById, update, softDelete, addComment,
+  addAttachment, findAttachments, findAttachment, deleteAttachment,
+};

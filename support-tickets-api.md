@@ -117,6 +117,53 @@ DELETE /tickets/:id  → 200 { "deleted": true, "id" }
 ```
 Marca `deleted_at`; some das listagens e do board (não apaga do banco).
 
+## Anexos (object storage)
+
+Os arquivos vão para um bucket S3-compatível; o backend guarda só os metadados
+e gera **URLs temporárias assinadas** para download (o front não passa o arquivo
+pelo servidor no download). `storageKey` nunca é exposto.
+
+```ts
+type TicketAttachment = {
+  id: string;
+  ticketId: string;
+  filename: string;
+  mimeType: string | null;
+  size: number | null;
+  uploadedBy: string | null;
+  createdAt: string;
+};
+```
+
+### Anexar arquivo (multipart)
+```
+POST /tickets/:id/attachments      (multipart/form-data)
+  file: <binário>        // obrigatório, campo "file"
+  uploadedBy: "operador1" // opcional
+→ 201 TicketAttachment
+```
+`400` sem arquivo · `413` acima do limite (`TICKET_MAX_UPLOAD_MB`, padrão 25 MB)
+· `503` storage não configurado no servidor.
+
+### Listar anexos
+```
+GET /tickets/:id/attachments  → 200 { items: TicketAttachment[] }
+```
+(Também vêm no detalhe do chamado, em `attachments[]`.)
+
+### Baixar (URL temporária assinada)
+```
+GET /tickets/:id/attachments/:attId/url
+→ 200 { "url": "https://…", "expiresIn": 300, "filename": "print.png" }
+```
+O front usa essa `url` direto (expira em `S3_URL_TTL_SEC`, padrão 300s).
+
+### Remover anexo
+```
+DELETE /tickets/:id/attachments/:attId  → 200 { "deleted": true, "id" }
+```
+Remove do bucket **e** do banco.
+
 ## Sugestão de telas (front)
 1. **Board kanban** (`GET /tickets/board`): 5 colunas, cards com `#number`,
    assunto, prioridade (cor), responsável, tempo. Drag & drop → `PATCH` com
@@ -130,7 +177,17 @@ Marca `deleted_at`; some das listagens e do board (não apaga do banco).
    CPF e busca textual.
 
 ## Config de deploy
-- **Migration nova** (`tickets`, `ticket_comments`): rodar
+- **Migrations novas** (`tickets`, `ticket_comments`, `ticket_attachments`):
   `npm run migrate` + `npx prisma generate` + restart.
-- **`SUPPORT_NOTIFY_EMAIL`** (env, opcional): destino da notificação de novo
-  chamado. Sem ela, usa `caiomdavidinha@gmail.com`.
+- **`SUPPORT_NOTIFY_EMAIL`** (opcional): destino da notificação de novo chamado.
+  Sem ela, usa `caiomdavidinha@gmail.com`.
+- **Object storage (anexos)** — env S3-compatível (funciona com AWS S3, DO
+  Spaces, Cloudflare R2, Backblaze B2, MinIO):
+  - `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (obrigatórios p/ anexos)
+  - `S3_REGION` (padrão `us-east-1`)
+  - `S3_ENDPOINT` (para provedores não-AWS, ex. `https://<region>.digitaloceanspaces.com`)
+  - `S3_FORCE_PATH_STYLE=true` (MinIO e alguns provedores)
+  - `S3_URL_TTL_SEC` (validade da URL de download, padrão 300)
+  - `TICKET_MAX_UPLOAD_MB` (limite por arquivo, padrão 25)
+  - Sem essas envs, os chamados funcionam normalmente; só o upload de anexo
+    responde `503`.
