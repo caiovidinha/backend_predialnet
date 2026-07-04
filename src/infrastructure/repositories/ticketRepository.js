@@ -13,7 +13,7 @@ const buildWhere = ({ status, priority, assignee, cpf, q } = {}) => {
       { subject: { contains: q } },
       { description: { contains: q } },
       { requesterName: { contains: q } },
-      { requesterEmail: { contains: q } },
+      { cpf: { contains: q } },
     ];
   }
   return where;

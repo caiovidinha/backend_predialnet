@@ -153,12 +153,10 @@ model Ticket {
   category    String?
   position    Int            @default(0) // ordenação dentro da coluna (kanban)
 
-  // Solicitante (form)
-  requesterName  String?
-  requesterEmail String?
-  requesterPhone String?
-  cpf            String?
-  codcliente     String?
+  // Quem abriu (operador) e cliente relacionado (dados vêm da API via CPF)
+  requesterName String?
+  cpf           String?
+  codcliente    String?
 
   // Atendimento
   assignee   String?

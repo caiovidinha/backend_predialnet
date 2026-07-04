@@ -10,7 +10,6 @@ const CLOSED_STATUSES = ['RESOLVIDO', 'FECHADO'];
 // Para onde vai a notificação de novo chamado.
 const NOTIFY_EMAIL = process.env.SUPPORT_NOTIFY_EMAIL || 'caiomdavidinha@gmail.com';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const clampStr = (v, max = 191) => {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
@@ -27,8 +26,8 @@ const newTicketEmailTemplate = (t) => `
       <p><strong>Assunto:</strong> ${t.subject}</p>
       <p><strong>Prioridade:</strong> ${t.priority} &nbsp;·&nbsp; <strong>Status:</strong> ${t.status}</p>
       ${t.category ? `<p><strong>Categoria:</strong> ${t.category}</p>` : ''}
-      <p><strong>Solicitante:</strong> ${t.requesterName || '—'} ${t.requesterEmail ? `(${t.requesterEmail})` : ''} ${t.requesterPhone ? `· ${t.requesterPhone}` : ''}</p>
-      ${t.cpf ? `<p><strong>CPF:</strong> ${t.cpf} ${t.codcliente ? `· <strong>Contrato:</strong> ${t.codcliente}` : ''}</p>` : ''}
+      <p><strong>Aberto por:</strong> ${t.requesterName || '—'}</p>
+      ${t.cpf ? `<p><strong>Cliente (CPF):</strong> ${t.cpf} ${t.codcliente ? `· <strong>Contrato:</strong> ${t.codcliente}` : ''}</p>` : ''}
       <hr style="border:none;border-top:1px solid #eee;margin:16px 0">
       <p style="white-space:pre-wrap">${t.description}</p>
     </div>
@@ -44,9 +43,6 @@ async function createTicket(payload = {}, context = {}) {
   if (!description) throw new ValidationError('description é obrigatória.');
 
   const priority = PRIORITIES.includes(payload.priority) ? payload.priority : 'MEDIA';
-  const requesterEmail = clampStr(payload.requesterEmail);
-  if (requesterEmail && !EMAIL_REGEX.test(requesterEmail))
-    throw new ValidationError('requesterEmail inválido.');
 
   const ticket = await ticketRepo.create({
     subject,
@@ -54,8 +50,6 @@ async function createTicket(payload = {}, context = {}) {
     priority,
     category: clampStr(payload.category),
     requesterName: clampStr(payload.requesterName),
-    requesterEmail,
-    requesterPhone: clampStr(payload.requesterPhone),
     cpf: payload.cpf ? String(payload.cpf).replace(/\D/g, '') || null : null,
     codcliente: clampStr(payload.codcliente),
     assignee: clampStr(payload.assignee ?? context.assignee),

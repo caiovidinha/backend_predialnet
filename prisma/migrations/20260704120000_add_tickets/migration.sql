@@ -9,8 +9,6 @@ CREATE TABLE `tickets` (
     `category` VARCHAR(191) NULL,
     `position` INTEGER NOT NULL DEFAULT 0,
     `requesterName` VARCHAR(191) NULL,
-    `requesterEmail` VARCHAR(191) NULL,
-    `requesterPhone` VARCHAR(191) NULL,
     `cpf` VARCHAR(191) NULL,
     `codcliente` VARCHAR(191) NULL,
     `assignee` VARCHAR(191) NULL,

@@ -25,11 +25,9 @@ type Ticket = {
   priority: TicketPriority;
   category: string | null;
   position: number;       // ordem dentro da coluna (kanban)
-  requesterName: string | null;
-  requesterEmail: string | null;
-  requesterPhone: string | null;
-  cpf: string | null;
-  codcliente: string | null;
+  requesterName: string | null; // operador que abriu o chamado
+  cpf: string | null;           // cliente relacionado (dados vêm da API via CPF)
+  codcliente: string | null;    // contrato (opcional)
   assignee: string | null;
   closedAt: string | null; // setado ao entrar em RESOLVIDO/FECHADO
   createdAt: string;
@@ -48,27 +46,27 @@ type TicketComment = {
 
 ## Endpoints
 
-### Abrir chamado (form) — dispara e-mail ao suporte
+### Abrir chamado (operador → suporte) — dispara e-mail
 ```
 POST /tickets
 Body: {
-  "subject": "Sem internet",           // obrigatório
+  "subject": "Sem internet",            // obrigatório
   "description": "Cliente sem conexão", // obrigatório
   "priority": "ALTA",                   // opcional (default MEDIA)
   "category": "Conexão",                // opcional
-  "requesterName": "Fulano",
-  "requesterEmail": "f@x.com",
-  "requesterPhone": "21 99999-9999",
-  "cpf": "02227913738",
-  "codcliente": "157175",
-  "assignee": "operador1"
+  "requesterName": "Operador João",     // quem abriu (opcional)
+  "cpf": "02227913738",                 // cliente relacionado (opcional)
+  "codcliente": "157175",               // contrato (opcional)
+  "assignee": "operador1"               // responsável (opcional)
 }
 → 201 Ticket
 ```
-Ao criar, envia um e-mail de notificação para o suporte
-(`SUPPORT_NOTIFY_EMAIL`, padrão `caiomdavidinha@gmail.com`). O envio é
-best-effort — se falhar, o chamado ainda é criado. `400` se faltar
-subject/description ou `requesterEmail` inválido.
+O chamado é aberto **pelo operador para o suporte**. Do cliente basta o `cpf`
+(e opcionalmente `codcliente`) — o resto dos dados o painel puxa da API
+(`/support/clients/:credential/overview`, `.../contracts`).
+Ao criar, envia e-mail de notificação para `SUPPORT_NOTIFY_EMAIL`
+(padrão `caiomdavidinha@gmail.com`), best-effort. `400` se faltar
+subject/description.
 
 ### Board kanban
 ```
