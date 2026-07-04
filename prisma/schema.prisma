@@ -126,6 +126,68 @@ model UserNotification {
   @@index([notificationId])
 }
 
+// ─── Chamados de suporte (tickets / kanban) ─────────────────────────────────
+
+enum TicketStatus {
+  ABERTO
+  EM_ANDAMENTO
+  AGUARDANDO
+  RESOLVIDO
+  FECHADO
+}
+
+enum TicketPriority {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+model Ticket {
+  id          String         @id @default(uuid())
+  number      Int            @unique @default(autoincrement()) // nº do chamado (sequencial)
+  subject     String
+  description String         @db.Text
+  status      TicketStatus   @default(ABERTO)
+  priority    TicketPriority @default(MEDIA)
+  category    String?
+  position    Int            @default(0) // ordenação dentro da coluna (kanban)
+
+  // Solicitante (form)
+  requesterName  String?
+  requesterEmail String?
+  requesterPhone String?
+  cpf            String?
+  codcliente     String?
+
+  // Atendimento
+  assignee   String?
+  closedAt   DateTime?
+  deleted_at DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  comments TicketComment[]
+
+  @@index([status])
+  @@index([cpf])
+  @@index([createdAt])
+  @@map("tickets")
+}
+
+model TicketComment {
+  id        String   @id @default(uuid())
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  ticketId  String
+  author    String? // operador ou "sistema"
+  body      String   @db.Text
+  internal  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("ticket_comments")
+}
+
 // ─── App Messages ────────────────────────────────────────────────────────────
 
 enum TargetingType {
