@@ -175,7 +175,11 @@ const getClientsByAddress = async ({ cidade, bairro, cep, numero } = {}) => {
 // ── private ──────────────────────────────────────────────────
 const PRIORITY_ORDER = ['CLIENTE', 'CEP_NUMERO', 'CEP', 'RUA', 'BAIRRO_CIDADE', 'CIDADE', 'GLOBAL'];
 
-function _pickBestMessage(messages, cpf, addr) {
+// Mensagens (por id) que não devem mais ser entregues ao app
+const SUPPRESSED_MESSAGE_IDS = [15];
+
+function _pickBestMessage(allMessages, cpf, addr) {
+  const messages = allMessages.filter(m => !SUPPRESSED_MESSAGE_IDS.includes(m.id));
   if (!messages.length) return null;
   for (const type of PRIORITY_ORDER) {
     let match = null;
