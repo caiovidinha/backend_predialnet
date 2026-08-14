@@ -43,6 +43,10 @@ const getClientData = async (id) => {
       .catch(err => logger.warn('Falha ao popular ClientAddress (lazy)', { cpf, error: err.message }));
   }
 
+  if (_isSuppressedExternalMessage(response?.cliente?.msg_monitoramento)) {
+    response.cliente = { ...response.cliente, msg_monitoramento: null };
+  }
+
   try {
     const addr = cpf ? await clientAddressRepo.findByCpf(cpf) : null;
     const messages = await messageRepo.findForClient({ cpf, addr });
@@ -135,7 +139,8 @@ const updateControleParental = async (id, data) => {
 const getAlertMessage = async (codcliente) => {
   const res = await uaipi.get(`/clientes/${codcliente}`);
   const clienteData = res.data[0];
-  const externalMsg = clienteData?.cliente?.msg_monitoramento ?? null;
+  const rawExternalMsg = clienteData?.cliente?.msg_monitoramento ?? null;
+  const externalMsg = _isSuppressedExternalMessage(rawExternalMsg) ? null : rawExternalMsg;
 
   const cpf = clienteData?.cliente?.inscricao ?? null;
   const cidade = clienteData?.cliente?.cidade ?? null;
@@ -175,11 +180,15 @@ const getClientsByAddress = async ({ cidade, bairro, cep, numero } = {}) => {
 // ── private ──────────────────────────────────────────────────
 const PRIORITY_ORDER = ['CLIENTE', 'CEP_NUMERO', 'CEP', 'RUA', 'BAIRRO_CIDADE', 'CIDADE', 'GLOBAL'];
 
-// Mensagens (por id) que não devem mais ser entregues ao app
-const SUPPRESSED_MESSAGE_IDS = [15];
+// Mensagens da UAIPI (por id) que não devem mais ser entregues ao app.
+// Obs: só vale para ids da UAIPI (numéricos) — as mensagens do nosso banco usam UUID.
+const SUPPRESSED_EXTERNAL_MESSAGE_IDS = [15];
 
-function _pickBestMessage(allMessages, cpf, addr) {
-  const messages = allMessages.filter(m => !SUPPRESSED_MESSAGE_IDS.includes(m.id));
+function _isSuppressedExternalMessage(msg) {
+  return msg != null && SUPPRESSED_EXTERNAL_MESSAGE_IDS.includes(Number(msg.id));
+}
+
+function _pickBestMessage(messages, cpf, addr) {
   if (!messages.length) return null;
   for (const type of PRIORITY_ORDER) {
     let match = null;
