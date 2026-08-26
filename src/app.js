@@ -21,6 +21,7 @@ const testRouter = require('./http/routes/testRouter');
 const speedtestRouter = require('./http/routes/speedtestRouter');
 const supportRouter = require('./http/routes/supportRouter');
 const ticketRouter = require('./http/routes/ticketRouter');
+const blogRouter = require('./http/routes/blogRouter');
 
 const app = express();
 
@@ -29,12 +30,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// O blog traz CORS e parser de JSON próprios: a origem vem de uma allowlist
+// (nunca "*", por causa das rotas /blog/admin/*) e o JSON malformado precisa
+// sair no formato de erro da spec. Por isso fica fora dos middlewares globais.
+const doBlog = (req) => req.path === '/blog' || req.path.startsWith('/blog/');
+
 app.use((req, res, next) => {
-  if (req.path === '/eh-cliente') return next();
+  if (req.path === '/eh-cliente' || doBlog(req)) return next();
   return cors()(req, res, next);
 });
 
-app.use(express.json());
+const jsonParser = express.json();
+app.use((req, res, next) => {
+  if (doBlog(req)) return next();
+  return jsonParser(req, res, next);
+});
 app.use(express.urlencoded({ extended: true }));
 app.all('*', requestIntercepter);
 
@@ -50,6 +60,7 @@ app.use('/test', testRouter);
 app.use('/speedtest', speedtestRouter);
 app.use('/support', supportRouter);
 app.use('/tickets', ticketRouter);
+app.use('/blog', blogRouter);
 app.use('/', ehClienteRouter);
 
 app.get('/docs', swaggerAuthMiddleware, (req, res, next) => {

@@ -313,3 +313,139 @@ model SpeedTest {
   @@index([cpf, createdAt])
   @@map("speed_tests")
 }
+
+// ─── Blog ────────────────────────────────────────────────────────────────────
+// Backend do blog. O front fica em blog.predialnet.com.br (Next.js, projeto
+// separado): lê os endpoints públicos e escreve pelos /blog/admin/*.
+// Contrato completo em blog-api.md.
+//
+// Ids inteiros (e não uuid como no resto do schema) porque o front já está
+// escrito contra `"id": 12`.
+
+enum BlogStatus {
+  rascunho
+  publicado
+  arquivado
+}
+
+enum BlogPapel {
+  admin
+  editor
+}
+
+model BlogCategoria {
+  id        Int          @id @default(autoincrement())
+  slug      String       @unique
+  nome      String
+  descricao String?      @db.Text
+  ordem     Int          @default(0)
+  criado_em DateTime     @default(now())
+  artigos   BlogArtigo[]
+
+  @@map("blog_categorias")
+}
+
+model BlogArtigo {
+  id          Int           @id @default(autoincrement())
+  slug        String        @unique
+  titulo      String
+  resumo      String        @db.Text
+  categoria   BlogCategoria @relation(fields: [categoriaId], references: [id])
+  categoriaId Int
+  autor       String        @default("Predialnet")
+  corpo       String        @db.LongText // HTML já sanitizado na escrita
+
+  // Capa (achatada no banco, aninhada na resposta da API)
+  capa_url     String? @db.Text
+  capa_alt     String?
+  capa_largura Int?
+  capa_altura  Int?
+
+  destaque      Boolean    @default(false) // só um artigo por vez
+  status        BlogStatus @default(rascunho)
+  publicado_em  DateTime?
+  criado_em     DateTime   @default(now())
+  atualizado_em DateTime   @updatedAt
+  tempo_leitura Int        @default(1)
+  visualizacoes Int        @default(0)
+
+  // Última vez que o blog (Next) foi avisado sobre este artigo. O job de
+  // agendados usa isto para saber quem já entrou no ar e quem falta avisar.
+  revalidado_em DateTime?
+
+  // SEO (achatado no banco, aninhado na resposta da API)
+  seo_titulo    String?
+  seo_descricao String? @db.Text
+  seo_noindex   Boolean @default(false)
+
+  @@index([status, publicado_em])
+  @@index([status, publicado_em, revalidado_em])
+  @@index([categoriaId])
+  @@index([destaque])
+  @@map("blog_artigos")
+}
+
+model BlogUsuario {
+  id         Int       @id @default(autoincrement())
+  nome       String
+  email      String    @unique
+  senha_hash String // bcrypt
+  papel      BlogPapel @default(editor)
+  ativo      Boolean   @default(true)
+  ultimo_login DateTime?
+  criado_em  DateTime  @default(now())
+
+  refresh_tokens BlogRefreshToken[]
+
+  @@map("blog_usuarios")
+}
+
+// Refresh token opaco: o banco guarda só o sha256, nunca o valor emitido.
+model BlogRefreshToken {
+  id         String      @id @default(uuid())
+  usuario    BlogUsuario @relation(fields: [usuarioId], references: [id])
+  usuarioId  Int
+  token_hash String      @unique
+  expira_em  DateTime
+  revogado_em DateTime?
+  criado_em  DateTime    @default(now())
+
+  @@index([usuarioId])
+  @@map("blog_refresh_tokens")
+}
+
+model BlogNewsletter {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  origem    String?
+  ativo     Boolean  @default(true)
+  criado_em DateTime @default(now())
+
+  @@map("blog_newsletter")
+}
+
+// Slug antigo → slug novo, para o site emitir 301 e não perder ranking.
+model BlogRedirecionamento {
+  id        Int      @id @default(autoincrement())
+  de        String   @unique
+  para      String
+  criado_em DateTime @default(now())
+
+  @@map("blog_redirecionamentos")
+}
+
+model BlogAuditoria {
+  id          Int      @id @default(autoincrement())
+  usuarioId   Int?
+  usuarioNome String?
+  acao        String // login | criar | editar | publicar | excluir | upload
+  entidade    String // artigo | usuario | midia
+  entidadeId  String?
+  detalhes    String?  @db.Text
+  ip          String?
+  criado_em   DateTime @default(now())
+
+  @@index([entidade, entidadeId])
+  @@index([criado_em])
+  @@map("blog_auditoria")
+}
