@@ -20,6 +20,7 @@ const notificacoes = responder('notificacoes', statsService.notificacoes);
 const chamados = responder('chamados', statsService.chamados);
 const speedtest = responder('speedtest', statsService.speedtest);
 const blog = responder('blog', statsService.blog);
+const upgrades = responder('upgrades', statsService.upgrades);
 
 // Escape hatch para quando o operador acabou de mexer em algo e quer o número
 // novo sem esperar o TTL.
@@ -28,4 +29,4 @@ const limparCache = async (_req, res) => {
   return res.status(200).json({ ok: true, mensagem: 'Cache de estatísticas limpo.' });
 };
 
-module.exports = { overview, usuarios, notificacoes, chamados, speedtest, blog, limparCache };
+module.exports = { overview, usuarios, notificacoes, chamados, speedtest, blog, upgrades, limparCache };

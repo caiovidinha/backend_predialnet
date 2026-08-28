@@ -1,4 +1,5 @@
 const statsRepo = require('../../infrastructure/repositories/statsRepository');
+const upgradesStats = require('./UpgradesStats');
 const logger = require('../../utils/logger');
 
 // Estatísticas do app para o dashboard do operador.
@@ -52,16 +53,22 @@ const visaoGeral = async (dias) => {
   return comCache(`overview:${periodo.dias}`, async () => {
     // Uma falha num domínio não pode apagar o dashboard inteiro — o operador
     // prefere ver cinco blocos e um erro a ver uma tela branca.
-    const [usuarios, notificacoes, chamados, speedtest, blog, mensagens] = await Promise.all([
+    const [usuarios, notificacoes, chamados, speedtest, blog, mensagens, upgrades] = await Promise.all([
       statsRepo.usuarios(desde).catch(erroDe('usuarios')),
       statsRepo.notificacoes(desde).catch(erroDe('notificacoes')),
       statsRepo.chamados(desde).catch(erroDe('chamados')),
       statsRepo.speedtest(desde).catch(erroDe('speedtest')),
       statsRepo.blog(desde).catch(erroDe('blog')),
       statsRepo.mensagensApp().catch(erroDe('mensagens')),
+      // Único domínio que depende de serviço externo (Trello); o isolamento
+      // aqui não é luxo, é o que impede a API deles de derrubar o dashboard.
+      upgradesStats.upgrades(desde).catch(erroDe('upgrades')),
     ]);
 
-    return { periodo, usuarios, notificacoes, chamados, speedtest, blog, mensagens_app: mensagens };
+    return {
+      periodo, usuarios, notificacoes, chamados, speedtest, blog,
+      mensagens_app: mensagens, upgrades,
+    };
   });
 };
 
@@ -130,6 +137,16 @@ const blog = async (dias) => {
   });
 };
 
+// O board do Trello é fonte externa: cachear ajuda mais aqui do que nos outros,
+// porque cada consulta são três chamadas HTTP para fora.
+const upgrades = async (dias) => {
+  const { desde, periodo } = janela(dias);
+  return comCache(`upgrades:${periodo.dias}`, async () => ({
+    periodo,
+    ...(await upgradesStats.upgrades(desde)),
+  }));
+};
+
 module.exports = {
   visaoGeral,
   usuarios,
@@ -137,6 +154,7 @@ module.exports = {
   chamados,
   speedtest,
   blog,
+  upgrades,
   limparCache,
   normalizarDias,
   DIAS_PADRAO,

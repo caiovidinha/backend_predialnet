@@ -98,6 +98,19 @@ router.get('/blog', ctrl.blog);
 
 /**
  * @swagger
+ * /stats/upgrades:
+ *   get:
+ *     summary: Funil de upgrade de planos (board do Trello alimentado pelo app)
+ *     tags: [Stats]
+ *     parameters:
+ *       - { in: query, name: dias, schema: { type: integer, default: 30, maximum: 365 } }
+ *     responses:
+ *       200: { description: "Funil por lista, convertidos, taxa de conversão e novos leads por dia" }
+ */
+router.get('/upgrades', ctrl.upgrades);
+
+/**
+ * @swagger
  * /stats/cache:
  *   delete:
  *     summary: Limpa o cache das estatísticas (TTL padrão de 60 s)
