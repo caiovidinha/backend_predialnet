@@ -49,10 +49,18 @@ const pedir = async (caminho, params = {}) => {
 const buscarListas = () =>
   pedir(`/boards/${BOARD}/lists`, { fields: 'id,name', filter: 'open' });
 
-// Pagina para trás usando o próprio id como cursor: ids do Trello crescem com o
-// tempo, então `before` sempre avança para cartões mais antigos.
+// Pagina para trás com o id como cursor: ids do Trello crescem com o tempo,
+// então `before` avança para cartões mais antigos.
+//
+// Duas proteções que não são paranoia — a ausência delas inflava a contagem:
+//
+// 1. O cursor é o MENOR id do lote, não o último. A API não garante ordem por
+//    id, e usar o último faria a página seguinte cobrir de novo um pedaço do
+//    intervalo já lido.
+// 2. Deduplicação por id. Mesmo com o cursor certo, cartão movido de lista
+//    durante a paginação pode reaparecer. Contar duas vezes é pior que demorar.
 const buscarCartoes = async () => {
-  const cartoes = [];
+  const porId = new Map();
   let cursor;
 
   for (let pagina = 0; pagina < MAX_PAGINAS; pagina += 1) {
@@ -65,13 +73,31 @@ const buscarCartoes = async () => {
     });
 
     if (!Array.isArray(lote) || lote.length === 0) break;
-    cartoes.push(...lote);
+
+    const antes = porId.size;
+    let menorId = null;
+    for (const cartao of lote) {
+      if (!cartao?.id) continue;
+      porId.set(cartao.id, cartao);
+      if (menorId === null || cartao.id < menorId) menorId = cartao.id;
+    }
+
+    const novos = porId.size - antes;
+    if (novos !== lote.length) {
+      logger.warn('stats: Trello devolveu cartões repetidos na paginação', {
+        pagina, no_lote: lote.length, novos,
+      });
+    }
+
+    // Lote inteiro repetido significa que o cursor parou de avançar — sair aqui
+    // evita laço infinito até o teto de páginas.
+    if (novos === 0) break;
     if (lote.length < POR_PAGINA) break;
 
-    cursor = lote[lote.length - 1].id;
+    cursor = menorId;
   }
 
-  return cartoes;
+  return [...porId.values()];
 };
 
 // Devolve null quando não dá para consultar — quem chama transforma isso em
