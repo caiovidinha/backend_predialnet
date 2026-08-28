@@ -19,6 +19,12 @@ model User {
   userNotifications UserNotification[]  // ← nova relação
   email_change      EmailChange?
 
+  // Anulável de propósito: quem já existia antes desta coluna não tem data de
+  // cadastro conhecida, e preencher com o instante da migration falsearia toda
+  // estatística de "usuários novos".
+  createdAt         DateTime?          @default(now())
+
+  @@index([createdAt])
   @@map("users")
 }
 
