@@ -6,6 +6,19 @@ const { slugValido } = require('./slug');
 
 const iso = (data) => (data ? new Date(data).toISOString() : null);
 
+// As duas imagens do artigo têm o mesmo formato; muda só o prefixo da coluna.
+// Sem url não há imagem — devolve null em vez de um objeto com campos vazios.
+const montarImagem = (row, prefixo) => {
+  const url = row[`${prefixo}_url`];
+  if (!url) return null;
+  return {
+    url,
+    alt: row[`${prefixo}_alt`] ?? '',
+    largura: row[`${prefixo}_largura`] ?? null,
+    altura: row[`${prefixo}_altura`] ?? null,
+  };
+};
+
 const serializarArtigo = (row, { incluirCorpo = true } = {}) => {
   if (!row) return null;
 
@@ -17,14 +30,10 @@ const serializarArtigo = (row, { incluirCorpo = true } = {}) => {
     categoria: row.categoria?.nome ?? null,
     categoria_slug: row.categoria?.slug ?? null,
     autor: row.autor,
-    capa: row.capa_url
-      ? {
-        url: row.capa_url,
-        alt: row.capa_alt ?? '',
-        largura: row.capa_largura ?? null,
-        altura: row.capa_altura ?? null,
-      }
-      : null,
+    // capa: card da listagem, categorias e Open Graph (16:9).
+    capa: montarImagem(row, 'capa'),
+    // capa_interna: topo da página do post, no tamanho original.
+    capa_interna: montarImagem(row, 'capa_interna'),
     destaque: row.destaque,
     status: row.status,
     publicado_em: iso(row.publicado_em),
@@ -97,9 +106,13 @@ const validarArtigo = (dados, { parcial = false } = {}) => {
     if (!Number.isInteger(n) || n < 1) campos.tempo_leitura = 'Deve ser um inteiro maior que zero.';
   }
 
-  if (informado('capa') && dados.capa !== null) {
-    if (typeof dados.capa !== 'object' || Array.isArray(dados.capa)) campos.capa = 'Deve ser um objeto.';
-    else if (vazio(dados.capa.url)) campos.capa = 'A capa precisa de uma url.';
+  // As duas imagens seguem a mesma regra: ou vem null (remove), ou vem objeto
+  // com url. Enviar `{}` sem url é quase sempre engano do painel.
+  for (const campo of ['capa', 'capa_interna']) {
+    if (!informado(campo) || dados[campo] === null) continue;
+    if (typeof dados[campo] !== 'object' || Array.isArray(dados[campo]))
+      campos[campo] = 'Deve ser um objeto.';
+    else if (vazio(dados[campo].url)) campos[campo] = 'Precisa de uma url.';
   }
 
   if (informado('seo') && dados.seo !== null) {

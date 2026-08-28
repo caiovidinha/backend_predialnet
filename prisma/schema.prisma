@@ -355,11 +355,18 @@ model BlogArtigo {
   autor       String        @default("Predialnet")
   corpo       String        @db.LongText // HTML já sanitizado na escrita
 
-  // Capa (achatada no banco, aninhada na resposta da API)
+  // Duas imagens independentes, achatadas no banco e aninhadas na resposta.
+  // capa: card da listagem, páginas de categoria e Open Graph (16:9).
+  // capa_interna: topo da página do post, no tamanho original.
   capa_url     String? @db.Text
   capa_alt     String?
   capa_largura Int?
   capa_altura  Int?
+
+  capa_interna_url     String? @db.Text
+  capa_interna_alt     String?
+  capa_interna_largura Int?
+  capa_interna_altura  Int?
 
   destaque      Boolean    @default(false) // só um artigo por vez
   status        BlogStatus @default(rascunho)

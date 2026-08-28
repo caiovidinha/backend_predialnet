@@ -60,7 +60,9 @@ const listarRedirecionamentos = async () => {
 
 // ── Painel ───────────────────────────────────────────────────
 
-const listarArtigosAdmin = async ({ status = 'todos', busca, pagina = 1, porPagina = 20 }) => {
+const listarArtigosAdmin = async ({
+  status = 'todos', busca, pagina = 1, porPagina = 20, incluirCorpo = false,
+}) => {
   const limite = Math.min(Math.max(1, porPagina), POR_PAGINA_MAX);
   const { items, total } = await artigoRepo.listarAdmin({
     status,
@@ -70,7 +72,7 @@ const listarArtigosAdmin = async ({ status = 'todos', busca, pagina = 1, porPagi
   });
 
   return {
-    artigos: items.map((a) => serializarArtigo(a, { incluirCorpo: false })),
+    artigos: items.map((a) => serializarArtigo(a, { incluirCorpo })),
     paginacao: montarPaginacao(pagina, limite, total),
   };
 };
@@ -106,11 +108,14 @@ const montarDados = async (entrada) => {
   if (entrada.publicado_em !== undefined)
     dados.publicado_em = entrada.publicado_em ? new Date(entrada.publicado_em) : null;
 
-  if (entrada.capa !== undefined) {
-    dados.capa_url = entrada.capa?.url ?? null;
-    dados.capa_alt = entrada.capa?.alt ?? null;
-    dados.capa_largura = entrada.capa?.largura ?? null;
-    dados.capa_altura = entrada.capa?.altura ?? null;
+  // capa e capa_interna são independentes: mandar uma não mexe na outra, e
+  // mandar null remove só aquela.
+  for (const campo of ['capa', 'capa_interna']) {
+    if (entrada[campo] === undefined) continue;
+    dados[`${campo}_url`] = entrada[campo]?.url ?? null;
+    dados[`${campo}_alt`] = entrada[campo]?.alt ?? null;
+    dados[`${campo}_largura`] = entrada[campo]?.largura ?? null;
+    dados[`${campo}_altura`] = entrada[campo]?.altura ?? null;
   }
 
   if (entrada.seo !== undefined) {

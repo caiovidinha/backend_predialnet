@@ -26,6 +26,9 @@ const listarArtigos = async (req, res) => {
     busca: req.query.busca,
     pagina: inteiro(req.query.pagina, 1),
     porPagina: inteiro(req.query.por_pagina, 20),
+    // Mesmo parâmetro da listagem pública: o painel pede o corpo para abrir o
+    // editor já preenchido.
+    incluirCorpo: req.query.corpo === 'true' || req.query.corpo === '1',
   });
   return res.status(200).json(resultado);
 };

@@ -17,10 +17,27 @@ const OPCOES = {
   allowedAttributes: {
     a: ['href', 'title', 'target', 'rel'],
     img: ['src', 'alt', 'title', 'width', 'height', 'loading'],
-    th: ['colspan', 'rowspan', 'scope'],
-    td: ['colspan', 'rowspan'],
-    // Nenhum atributo global: mata on* (onclick, onerror…), style e data-*.
+    th: ['colspan', 'rowspan', 'scope', 'style'],
+    td: ['colspan', 'rowspan', 'style'],
+    // `style` só nas tags que contêm texto — é onde o botão de alinhamento do
+    // editor escreve. O conteúdo do atributo é filtrado por `allowedStyles`
+    // abaixo, então nada além de text-align sobrevive.
+    p: ['style'],
+    h2: ['style'],
+    h3: ['style'],
+    h4: ['style'],
+    li: ['style'],
+    blockquote: ['style'],
+    figcaption: ['style'],
+    // Nenhum atributo global: mata on* (onclick, onerror…) e data-*.
     '*': [],
+  },
+  // Allowlist dupla: a propriedade precisa ser text-align E o valor precisa
+  // casar com a regex. Qualquer outra declaração na mesma string é descartada,
+  // então `style="text-align:center;position:fixed;background:url(...)"` entra
+  // e sai como `style="text-align:center"`.
+  allowedStyles: {
+    '*': { 'text-align': [/^(left|right|center|justify)$/] },
   },
   // javascript: e data: em href ficam de fora por não estarem aqui.
   allowedSchemes: ['http', 'https', 'mailto', 'tel'],

@@ -287,6 +287,7 @@ router.get('/admin/eu', envolver(auth.eu));
  *       - { in: query, name: busca, schema: { type: string } }
  *       - { in: query, name: pagina, schema: { type: integer, default: 1 } }
  *       - { in: query, name: por_pagina, schema: { type: integer, default: 20, maximum: 100 } }
+ *       - { in: query, name: corpo, schema: { type: boolean, default: false }, description: Inclui o HTML do artigo — o editor do painel usa true }
  *     responses:
  *       200: { description: "{ artigos: [], paginacao: {} }" }
  *   post:
@@ -310,7 +311,8 @@ router.get('/admin/eu', envolver(auth.eu));
  *               publicado_em: { type: string, format: date-time }
  *               destaque: { type: boolean }
  *               tempo_leitura: { type: integer }
- *               capa: { type: object }
+ *               capa: { type: object, description: "Card da listagem e Open Graph (16:9) — { url, alt, largura, altura }" }
+ *               capa_interna: { type: object, description: "Topo da página do post, tamanho original — mesmo formato da capa" }
  *               seo: { type: object }
  *     responses:
  *       201: { description: Artigo criado }

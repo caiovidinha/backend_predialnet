@@ -37,6 +37,25 @@ describe('blog: sanitização do corpo', () => {
     expect(sanitizarCorpo('<h1>Título</h1>')).toBe('<h2>Título</h2>');
   });
 
+  it('preserva text-align nas tags de texto — é o botão de alinhamento do editor', () => {
+    expect(sanitizarCorpo('<p style="text-align:center">oi</p>')).toBe('<p style="text-align:center">oi</p>');
+    expect(sanitizarCorpo('<h2 style="text-align: justify">t</h2>')).toBe('<h2 style="text-align:justify">t</h2>');
+  });
+
+  it('descarta qualquer coisa no style que não seja text-align válido', () => {
+    // Sobra só o text-align; position/top somem junto.
+    expect(sanitizarCorpo('<p style="text-align:center;position:fixed;top:0">a</p>'))
+      .toBe('<p style="text-align:center">a</p>');
+    expect(sanitizarCorpo('<p style="text-align:banana">a</p>')).toBe('<p>a</p>');
+    expect(sanitizarCorpo('<p style="background:url(javascript:alert(1))">a</p>')).toBe('<p>a</p>');
+    expect(sanitizarCorpo('<p style="width:expression(alert(1))">a</p>')).toBe('<p>a</p>');
+  });
+
+  it('não deixa style em tag fora da lista de texto', () => {
+    expect(sanitizarCorpo('<a href="https://x.com" style="text-align:center">x</a>'))
+      .not.toContain('style');
+  });
+
   it('acrescenta rel="noopener noreferrer" em link externo', () => {
     expect(sanitizarCorpo('<a href="https://exemplo.com">x</a>'))
       .toContain('rel="noopener noreferrer"');
@@ -129,6 +148,10 @@ describe('blog: serialização', () => {
     capa_alt: 'alt',
     capa_largura: 1200,
     capa_altura: 675,
+    capa_interna_url: 'https://appgw.predialnet.com.br/blog/midia/b.webp',
+    capa_interna_alt: 'alt interna',
+    capa_interna_largura: 1200,
+    capa_interna_altura: 420,
     destaque: true,
     status: 'publicado',
     publicado_em: new Date('2026-08-12T12:00:00Z'),
@@ -157,6 +180,57 @@ describe('blog: serialização', () => {
 
   it('devolve capa nula quando não há imagem', () => {
     expect(serializarArtigo({ ...linha, capa_url: null }).capa).toBeNull();
+  });
+
+  it('entrega capa e capa_interna como imagens independentes', () => {
+    const artigo = serializarArtigo(linha);
+
+    // capa: card da listagem e Open Graph, em 16:9.
+    expect(artigo.capa).toEqual({
+      url: linha.capa_url, alt: 'alt', largura: 1200, altura: 675,
+    });
+    // capa_interna: topo do post, faixa mais baixa.
+    expect(artigo.capa_interna).toEqual({
+      url: linha.capa_interna_url, alt: 'alt interna', largura: 1200, altura: 420,
+    });
+  });
+
+  it('devolve capa_interna nula sem derrubar a capa — artigo antigo segue válido', () => {
+    const artigo = serializarArtigo({
+      ...linha, capa_interna_url: null, capa_interna_alt: null,
+      capa_interna_largura: null, capa_interna_altura: null,
+    });
+
+    expect(artigo.capa_interna).toBeNull();
+    expect(artigo.capa).not.toBeNull();
+  });
+});
+
+describe('blog: validação das imagens', () => {
+  const base = {
+    titulo: 'Wi-Fi 6', resumo: 'resumo', categoria: 'tecnologia', corpo: '<p>x</p>',
+  };
+
+  it('aceita as duas imagens com url', () => {
+    expect(validarArtigo({
+      ...base,
+      capa: { url: 'https://x/a.webp', alt: 'a' },
+      capa_interna: { url: 'https://x/b.webp', alt: 'b' },
+    })).toEqual({});
+  });
+
+  it('aceita null para remover só uma delas', () => {
+    expect(validarArtigo({ ...base, capa_interna: null })).toEqual({});
+  });
+
+  it('recusa imagem sem url', () => {
+    const campos = validarArtigo({ ...base, capa_interna: { alt: 'sem url' } });
+    expect(campos.capa_interna).toBe('Precisa de uma url.');
+    expect(campos.capa).toBeUndefined();
+  });
+
+  it('recusa imagem que não é objeto', () => {
+    expect(validarArtigo({ ...base, capa: 'https://x/a.webp' }).capa).toBe('Deve ser um objeto.');
   });
 });
 
