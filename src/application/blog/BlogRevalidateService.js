@@ -24,10 +24,18 @@ const TIMEOUT_MS = Number.parseInt(process.env.BLOG_REVALIDATE_TIMEOUT_MS, 10) |
 
 const configurado = () => Boolean(URL());
 
+// Uma vez só por processo: sem isso, um deploy com a variável faltando ficaria
+// silencioso e o sintoma (página velha) seria indistinguível de "não avisa na
+// edição". Com isso, aparece no log já na primeira tentativa.
+let avisouNaoConfigurado = false;
+
 // Devolve true só quando o blog confirmou. `motivo` explica o false para o log.
 const revalidar = async ({ slug = null, origem = 'api' } = {}) => {
   if (!configurado()) {
-    logger.debug?.('blog: BLOG_REVALIDATE_URL não configurado, revalidação ignorada');
+    if (!avisouNaoConfigurado) {
+      avisouNaoConfigurado = true;
+      logger.warn('blog: BLOG_REVALIDATE_URL não configurado — o blog só atualiza no fallback de 5 min');
+    }
     return { ok: false, motivo: 'nao_configurado' };
   }
 

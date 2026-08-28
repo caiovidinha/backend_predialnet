@@ -3,7 +3,7 @@ require('dotenv').config();
 const pushQueue = require('../queues/pushQueue');
 const { sendPushNotifications, getPushNotificationReceipts } = require('../services/expoPushService');
 const { PrismaClient } = require('@prisma/client');
-const { deletePushToken } = require('../models/push');
+const { deleteByToken } = require('../infrastructure/repositories/pushTokenRepository');
 const logger = require('../utils/logger');
 const prisma = new PrismaClient();
 
@@ -30,12 +30,33 @@ pushQueue.process(20, async job => {
     // 3) busca receipts detalhados e limpa tokens inválidos
     const receiptIds = tickets.map(t => t.id).filter(Boolean);
     if (receiptIds.length) {
+      // Os receipts vêm indexados por ticketId, não por token. Para saber qual
+      // token remover é preciso parear ticket com a mensagem que o gerou: o
+      // Expo devolve os tickets na mesma ordem das mensagens enviadas.
+      // Se algum chunk falhou no envio, vêm menos tickets que mensagens e o
+      // pareamento por índice deixa de valer — aí é melhor não remover nada do
+      // que remover o token de outra pessoa.
+      const tokenPorTicket = new Map();
+      if (tickets.length === messages.length) {
+        tickets.forEach((t, i) => { if (t.id) tokenPorTicket.set(t.id, messages[i].to); });
+      } else {
+        logger.warn(`⚠️  Job ${job.id}: ${tickets.length} tickets para ${messages.length} mensagens — limpeza de tokens ignorada`);
+      }
+
       const receipts = await getPushNotificationReceipts(receiptIds);
-      logger.info(receipts)
-      for (const [token, result] of Object.entries(receipts)) {
-        if (result.status === 'error' && result.details?.error === 'DeviceNotRegistered') {
-          await deletePushToken(token);
+      for (const [ticketId, result] of Object.entries(receipts)) {
+        if (result.status !== 'error' || result.details?.error !== 'DeviceNotRegistered') continue;
+
+        const token = tokenPorTicket.get(ticketId);
+        if (!token) continue;
+
+        try {
+          await deleteByToken(token);
           logger.warn(`🗑  Job ${job.id}: token inválido removido (${token})`);
+        } catch (err) {
+          // P2025: já tinha sido removido. Não é motivo para falhar o job —
+          // o push em si foi entregue.
+          logger.warn(`Job ${job.id}: token ${token} já não estava no banco`, { error: err.message });
         }
       }
     }
