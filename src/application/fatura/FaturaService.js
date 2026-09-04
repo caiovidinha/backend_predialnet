@@ -1,4 +1,5 @@
 const uaipi = require('../../infrastructure/external/uaipiClient');
+const override = require('./faturaOverride');
 const logger = require('../../utils/logger');
 
 const fetchFaturas = async (id) => {
@@ -27,6 +28,14 @@ const getLastSixInvoices = async (id) => {
 };
 
 const getPixFromLastOpenInternetInvoice = async (id) => {
+  // Mesma substituição da fatura atual. Fica antes da consulta porque, sem
+  // fatura em aberto de verdade, o caminho normal lança erro — e aí o app
+  // mostraria uma fatura aberta cujo botão de PIX quebra.
+  if (override.aplicavel(id)) {
+    logger.info('fatura: PIX substituído', { codcliente: override.codcliente(), origem: 'getPix' });
+    return { pix: override.pix() };
+  }
+
   const faturas = await fetchFaturas(id);
   const open = faturas
     .filter(f => f.tipo.toLowerCase() === 'internet' && !f.dta_pagamento)
@@ -50,6 +59,10 @@ const checkCurrentInvoiceStatus = async (id) => {
     ? abertas[0]
     : (faturas.filter(isActive).sort((a, b) => toMs(b.dta_vencimento) - toMs(a.dta_vencimento))[0]
         ?? faturas.sort((a, b) => toMs(b.dta_vencimento) - toMs(a.dta_vencimento))[0]);
+
+  // A mesma substituição do getCurrentInvoice. Sem isto, /fatura/atual diria
+  // "em aberto" enquanto /fatura/status diria "paga" para o mesmo cliente.
+  if (override.aplicavel(id)) atual = override.comoAberta(atual, 'checkCurrentInvoiceStatus');
 
   let status = 'em aberto';
   if (atual.dta_pagamento) status = 'paga';
@@ -76,6 +89,11 @@ const getCurrentInvoice = async (id) => {
   }
 
   const outrasPendentes = abertas.filter(f => f.boleta !== atual.boleta);
+
+  if (override.aplicavel(id)) {
+    return { faturaAtual: override.comoAberta(atual, 'getCurrentInvoice'), outrasPendentes };
+  }
+
   return { faturaAtual: atual, outrasPendentes };
 };
 
