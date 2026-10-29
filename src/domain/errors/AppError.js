@@ -22,4 +22,8 @@ class ValidationError extends AppError {
   constructor(message) { super(message, 400); }
 }
 
-module.exports = { AppError, AuthError, ForbiddenError, NotFoundError, ValidationError };
+class ServiceUnavailableError extends AppError {
+  constructor(message = 'Serviço temporariamente indisponível') { super(message, 503); }
+}
+
+module.exports = { AppError, AuthError, ForbiddenError, NotFoundError, ValidationError, ServiceUnavailableError };

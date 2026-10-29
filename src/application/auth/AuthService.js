@@ -7,7 +7,7 @@ const emailRepo = require('../../infrastructure/repositories/emailRepository');
 const tokenRepo = require('../../infrastructure/repositories/tokenRepository');
 const emailChangeRepo = require('../../infrastructure/repositories/emailChangeRepository');
 const logger = require('../../utils/logger');
-const { AppError, AuthError, ForbiddenError, NotFoundError, ValidationError } = require('../../domain/errors/AppError');
+const { AppError, AuthError, ForbiddenError, NotFoundError, ValidationError, ServiceUnavailableError } = require('../../domain/errors/AppError');
 
 // ──────────────────────────────────────────────────────────────
 // Helpers
@@ -69,19 +69,23 @@ const getCorrectEmail = async (censoredEmail) => {
 };
 
 const getUsersFromUAIPI = async (credential) => {
+  let data;
   try {
-    const data = await uaipi.get(`/clientes/${credential}`);
-    const users = data.data;
-    if (!users || users.length === 0) return null;
-    return {
-      users,
-      cpf: users[0].cliente.inscricao,
-      nome: users[0].cliente.nome,
-      email: users[0].cliente.email,
-    };
-  } catch {
-    return null;
+    data = await uaipi.get(`/clientes/${credential}`);
+  } catch (err) {
+    // A UAIPI respondeu com erro (timeout, instabilidade, 5xx) — não sabemos se é
+    // cliente ou não, então não pode ser tratado como "não é cliente Predialnet".
+    logger.error('Falha ao consultar UAIPI', { credential, error: err.message });
+    throw new ServiceUnavailableError('Não foi possível verificar seus dados agora. Tente novamente em alguns instantes.');
   }
+  const users = data.data;
+  if (!users || users.length === 0) return null;
+  return {
+    users,
+    cpf: users[0].cliente.inscricao,
+    nome: users[0].cliente.nome,
+    email: users[0].cliente.email,
+  };
 };
 
 const createTokenPair = async (userId) => {
