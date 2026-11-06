@@ -1,4 +1,5 @@
 const repo = require('../../infrastructure/repositories/parceriaRepository');
+const cadastroRepo = require('../../infrastructure/repositories/parceriaCadastroRepository');
 
 // Funil das parcerias do Assine Já (?parceria=<slug> na URL).
 //
@@ -113,24 +114,61 @@ const comTaxas = (f) => ({
   },
 });
 
+const funilZerado = () => Object.fromEntries(repo.CAMPOS_DO_FUNIL.map((c) => [c, 0]));
+
+// Junta o cadastro (nome, Instagram) aos slugs que aparecem nos eventos. Slug
+// com evento e sem cadastro é link divulgado antes de cadastrar: continua na
+// lista, marcado como não cadastrado.
+const catalogo = (cadastro, slugsComEvento) => {
+  const porSlug = new Map(cadastro.map((p) => [p.slug, p]));
+  const slugs = new Set([...cadastro.map((p) => p.slug), ...slugsComEvento]);
+  return [...slugs].map((slug) => {
+    const p = porSlug.get(slug);
+    return {
+      slug,
+      nome: p ? p.nome : slug,
+      instagram: p ? p.instagram : null,
+      cadastrada: Boolean(p),
+      ativo: p ? p.ativo : true,
+    };
+  }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+};
+
 const resumo = async ({ dias, parceria } = {}) => {
   const { desde, periodo } = janela(dias);
   const filtroParceria = normalizarParceria(parceria);
 
-  const [totais, parcerias, serie, planos, conhecidas] = await Promise.all([
+  const [totais, parcerias, serie, planos, slugsComEvento, cadastro] = await Promise.all([
     repo.totais(desde, filtroParceria),
     repo.porParceria(desde, filtroParceria),
     repo.porDia(desde, filtroParceria),
     repo.planos(desde, filtroParceria),
     repo.parceriasConhecidas(),
+    cadastroRepo.listar(),
   ]);
+
+  const conhecidas = catalogo(cadastro, slugsComEvento);
+  const info = new Map(conhecidas.map((p) => [p.slug, p]));
+  const descrever = (slug) => info.get(slug) || { slug, nome: slug, instagram: null, cadastrada: false, ativo: true };
+
+  const linhas = parcerias.map((l) => ({ ...descrever(l.parceria), ...comTaxas(l) }));
+
+  // Sem filtro, o influencer cadastrado (e ativo) que ainda não trouxe ninguém
+  // aparece com zero: "zero acessos" é informação, sumir da tabela não é.
+  if (!filtroParceria) {
+    const comLinha = new Set(linhas.map((l) => l.parceria));
+    conhecidas
+      .filter((p) => p.cadastrada && p.ativo && !comLinha.has(p.slug))
+      .forEach((p) => linhas.push({ ...p, parceria: p.slug, ...comTaxas(funilZerado()), ultimo_evento: null }));
+  }
 
   return {
     periodo,
     parceria: filtroParceria,
+    parceria_info: filtroParceria ? descrever(filtroParceria) : null,
     parcerias_conhecidas: conhecidas,
     totais: comTaxas(totais),
-    parcerias: parcerias.map(comTaxas),
+    parcerias: linhas,
     serie_diaria: serie,
     planos,
   };
@@ -157,14 +195,17 @@ const exportarCsv = async ({ dias, parceria, tipo } = {}) => {
   const { desde, periodo } = janela(dias);
   const filtroParceria = normalizarParceria(parceria);
   const sufixo = `${filtroParceria || 'todas'}-${periodo.dias}d`;
+  // Nome do cadastro ao lado do slug: na planilha ninguém lembra quem é "clube-sp-02".
+  const nomes = new Map((await cadastroRepo.listar()).map((p) => [p.slug, p.nome]));
+  const nomeDe = (slug) => nomes.get(slug) || '';
 
   if (tipo === 'eventos') {
     const linhas = await repo.eventos(desde, filtroParceria, LIMITE_EXPORTACAO);
     return {
       nome: `parcerias-eventos-${sufixo}.csv`,
       conteudo: paraCsv(
-        ['data_hora_brasilia', 'parceria', 'evento', 'detalhe', 'plano', 'sessao'],
-        linhas.map((e) => [dataHoraBRT(e.createdAt), e.parceria, e.evento, e.detalhe, e.plano, e.sessao]),
+        ['data_hora_brasilia', 'parceria', 'nome', 'evento', 'detalhe', 'plano', 'sessao'],
+        linhas.map((e) => [dataHoraBRT(e.createdAt), e.parceria, nomeDe(e.parceria), e.evento, e.detalhe, e.plano, e.sessao]),
       ),
     };
   }
@@ -173,8 +214,8 @@ const exportarCsv = async ({ dias, parceria, tipo } = {}) => {
   return {
     nome: `parcerias-diario-${sufixo}.csv`,
     conteudo: paraCsv(
-      ['dia', 'parceria', ...repo.CAMPOS_DO_FUNIL],
-      linhas.map((l) => [l.dia, l.parceria, ...repo.CAMPOS_DO_FUNIL.map((c) => l[c])]),
+      ['dia', 'parceria', 'nome', ...repo.CAMPOS_DO_FUNIL],
+      linhas.map((l) => [l.dia, l.parceria, nomeDe(l.parceria), ...repo.CAMPOS_DO_FUNIL.map((c) => l[c])]),
     ),
   };
 };

@@ -482,3 +482,22 @@ model ParceriaEvento {
   @@index([sessao])
   @@map("parceria_eventos")
 }
+
+// Cadastro dos influencers/parceiros. O slug é o que vai no link
+// (assineja?parceria=<slug>) e casa com ParceriaEvento.parceria. Não há
+// chave estrangeira de propósito: link divulgado antes do cadastro (ou de
+// parceria apagada) continua contando — aparece como "não cadastrada".
+model Parceria {
+  id         String   @id @default(uuid())
+  slug       String   @unique @db.VarChar(40)
+  nome       String   @db.VarChar(120)
+  instagram  String?  @db.VarChar(60) // sem @, só o usuário
+  contato    String?  @db.VarChar(120) // e-mail ou telefone do responsável
+  observacao String?  @db.Text
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([ativo])
+  @@map("parcerias")
+}

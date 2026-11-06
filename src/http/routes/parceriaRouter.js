@@ -1,6 +1,9 @@
 const express = require('express');
 const { criarRateLimit } = require('../middlewares/rateLimit');
-const { registrarEvento } = require('../controllers/parceriaController');
+const { validateJWT, requireAdmin } = require('../middlewares/auth');
+const {
+  registrarEvento, listarCadastro, criarCadastro, atualizarCadastro,
+} = require('../controllers/parceriaController');
 
 const router = express.Router();
 
@@ -50,6 +53,57 @@ const corpoTexto = express.text({ type: 'text/plain', limit: '4kb' });
  *       429: { description: Limite de requisições }
  */
 router.post('/eventos', limite, corpoTexto, registrarEvento);
+
+// ── Cadastro de influencers (operador) ───────────────────────
+// Mesma proteção do /stats: só o dashboard, com o ADMIN_BYPASS_TOKEN.
+const operador = [validateJWT, requireAdmin];
+
+/**
+ * @swagger
+ * /parcerias:
+ *   get:
+ *     summary: Lista os influencers/parceiros cadastrados (operador)
+ *     tags: [Parcerias]
+ *     responses:
+ *       200: { description: "[{ id, slug, nome, instagram, contato, observacao, ativo, createdAt, updatedAt }]" }
+ *   post:
+ *     summary: Cadastra um influencer/parceiro e define o slug do link (operador)
+ *     tags: [Parcerias]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nome]
+ *             properties:
+ *               nome: { type: string, example: "Fulana Silva" }
+ *               slug: { type: string, example: "fulana", description: "Opcional; sem ele, nasce do nome. Não muda depois." }
+ *               instagram: { type: string, example: "@fulana" }
+ *               contato: { type: string }
+ *               observacao: { type: string }
+ *     responses:
+ *       201: { description: Criado }
+ *       400: { description: Dados inválidos }
+ *       409: { description: Slug já existe }
+ */
+router.get('/', operador, listarCadastro);
+router.post('/', operador, criarCadastro);
+
+/**
+ * @swagger
+ * /parcerias/{id}:
+ *   patch:
+ *     summary: Edita nome, Instagram, contato, observação ou ativa/desativa (operador)
+ *     tags: [Parcerias]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Atualizado }
+ *       400: { description: Dados inválidos (inclusive tentar mudar o slug) }
+ *       404: { description: Não encontrado }
+ */
+router.patch('/:id', operador, atualizarCadastro);
 
 // O limitador entrega o erro por next(err) (formato do blog); aqui só importa
 // o status — o beacon nem lê a resposta.

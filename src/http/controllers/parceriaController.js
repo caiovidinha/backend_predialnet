@@ -55,4 +55,24 @@ async function exportarCsv(req, res) {
   }
 }
 
-module.exports = { registrarEvento, resumo, exportarCsv, lerCorpo };
+// ── Cadastro de influencers (operador) ───────────────────────
+
+const cadastroService = require('../../application/parcerias/ParceriaCadastroService');
+
+const responderCadastro = (nome, executar, status = 200) => async (req, res) => {
+  try {
+    return res.status(status).json(await executar(req));
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    logger.error(`parcerias ${nome} error`, { error: err.message, stack: err.stack });
+    return res.status(500).json({ error: 'Erro no cadastro de parcerias.' });
+  }
+};
+
+const listarCadastro = responderCadastro('listar', () => cadastroService.listar());
+const criarCadastro = responderCadastro('criar', (req) => cadastroService.criar(req.body), 201);
+const atualizarCadastro = responderCadastro('atualizar', (req) => cadastroService.atualizar(req.params.id, req.body));
+
+module.exports = {
+  registrarEvento, resumo, exportarCsv, lerCorpo, listarCadastro, criarCadastro, atualizarCadastro,
+};
