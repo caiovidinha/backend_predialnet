@@ -23,6 +23,7 @@ const supportRouter = require('./http/routes/supportRouter');
 const ticketRouter = require('./http/routes/ticketRouter');
 const blogRouter = require('./http/routes/blogRouter');
 const statsRouter = require('./http/routes/statsRouter');
+const parceriaRouter = require('./http/routes/parceriaRouter');
 
 const app = express();
 
@@ -63,6 +64,7 @@ app.use('/support', supportRouter);
 app.use('/tickets', ticketRouter);
 app.use('/blog', blogRouter);
 app.use('/stats', statsRouter);
+app.use('/parcerias', parceriaRouter);
 app.use('/', ehClienteRouter);
 
 app.get('/docs', swaggerAuthMiddleware, (req, res, next) => {

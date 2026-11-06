@@ -1,0 +1,138 @@
+jest.mock('../infrastructure/repositories/parceriaRepository', () => ({
+  registrar: jest.fn(),
+  totais: jest.fn(),
+  porParceria: jest.fn(),
+  porDia: jest.fn(),
+  planos: jest.fn(),
+  parceriasConhecidas: jest.fn(),
+  eventos: jest.fn(),
+  CAMPOS_DO_FUNIL: [
+    'visitantes', 'consultas', 'com_cobertura', 'sem_cobertura', 'cobertura_a_confirmar',
+    'dados', 'formularios', 'chat', 'envio_falhou', 'whatsapp',
+  ],
+}));
+
+const repo = require('../infrastructure/repositories/parceriaRepository');
+const service = require('../application/parcerias/ParceriaService');
+const { lerCorpo } = require('../http/controllers/parceriaController');
+
+const SESSAO = '2f1c9a4e-0b7d-4a51-9a63-1c2b3d4e5f60';
+const valido = (extra = {}) => ({ parceria: 'clube-xyz', evento: 'acesso', sessao: SESSAO, ...extra });
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  repo.registrar.mockResolvedValue({ id: 'x' });
+});
+
+describe('parcerias: normalização', () => {
+  it('vira slug: acento, caixa e espaço', () => {
+    expect(service.normalizarParceria('  Clube São João  ')).toBe('clube-sao-joao');
+  });
+
+  it('corta em 40 caracteres', () => {
+    expect(service.normalizarParceria('a'.repeat(80))).toHaveLength(40);
+  });
+
+  it('só símbolo vira nulo', () => {
+    expect(service.normalizarParceria('!!!')).toBeNull();
+  });
+});
+
+describe('parcerias: validação do evento', () => {
+  it('aceita um acesso simples', async () => {
+    await service.registrar(valido(), { userAgent: 'UA' });
+    expect(repo.registrar).toHaveBeenCalledWith(expect.objectContaining({
+      parceria: 'clube-xyz', evento: 'acesso', sessao: SESSAO, userAgent: 'UA',
+    }));
+  });
+
+  it('recusa sem parceria', async () => {
+    await expect(service.registrar(valido({ parceria: '' }))).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('recusa evento fora da allowlist', async () => {
+    await expect(service.registrar(valido({ evento: 'compra' }))).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('recusa sessão malformada', async () => {
+    await expect(service.registrar(valido({ sessao: "'; DROP TABLE" }))).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('consulta exige detalhe da allowlist', async () => {
+    await expect(service.registrar(valido({ evento: 'consulta' }))).rejects.toMatchObject({ statusCode: 400 });
+    await expect(service.registrar(valido({ evento: 'consulta', detalhe: 'xpto' }))).rejects.toMatchObject({ statusCode: 400 });
+    await service.registrar(valido({ evento: 'consulta', detalhe: 'sem_cobertura' }));
+    expect(repo.registrar).toHaveBeenCalledTimes(1);
+  });
+
+  it('acesso não aceita detalhe', async () => {
+    await expect(service.registrar(valido({ detalhe: 'chat' }))).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('não guarda a query string do referrer (pode ter dado pessoal)', async () => {
+    await service.registrar(valido({ origem: 'https://instagram.com/p/abc?email=a@b.com' }));
+    expect(repo.registrar.mock.calls[0][0].origem).toBe('https://instagram.com/p/abc');
+  });
+
+  it('ignora campos que não existem no modelo (nome, celular)', async () => {
+    await service.registrar(valido({ nome: 'Fulano', celular: '21999999999' }));
+    const gravado = repo.registrar.mock.calls[0][0];
+    expect(gravado).not.toHaveProperty('nome');
+    expect(gravado).not.toHaveProperty('celular');
+  });
+
+  it('lê o corpo do sendBeacon (text/plain)', () => {
+    expect(lerCorpo(JSON.stringify(valido()))).toEqual(valido());
+    expect(lerCorpo('não é json')).toBeNull();
+  });
+});
+
+describe('parcerias: resumo', () => {
+  const funil = {
+    visitantes: 200, consultas: 120, com_cobertura: 90, sem_cobertura: 20, cobertura_a_confirmar: 10,
+    dados: 80, formularios: 40, chat: 15, envio_falhou: 1, whatsapp: 25,
+  };
+
+  beforeEach(() => {
+    repo.totais.mockResolvedValue(funil);
+    repo.porParceria.mockResolvedValue([{ parceria: 'clube-xyz', ...funil }]);
+    repo.porDia.mockResolvedValue([]);
+    repo.planos.mockResolvedValue([]);
+    repo.parceriasConhecidas.mockResolvedValue(['clube-xyz']);
+  });
+
+  it('calcula as taxas do funil', async () => {
+    const r = await service.resumo({ dias: 7 });
+    expect(r.periodo.dias).toBe(7);
+    expect(r.totais.taxas).toEqual({ consulta: 60, cobertura: 75, conversao: 20, whatsapp: 12.5 });
+  });
+
+  it('taxa sem base é nula, não divisão por zero', async () => {
+    repo.totais.mockResolvedValue({ ...funil, visitantes: 0, consultas: 0 });
+    const r = await service.resumo({});
+    expect(r.totais.taxas.conversao).toBeNull();
+    expect(r.totais.taxas.cobertura).toBeNull();
+  });
+
+  it('normaliza o filtro de parceria antes de consultar', async () => {
+    await service.resumo({ parceria: 'Clube XYZ' });
+    expect(repo.totais).toHaveBeenCalledWith(expect.any(Date), 'clube-xyz');
+  });
+});
+
+describe('parcerias: CSV', () => {
+  it('sai com BOM, ";" e escapa fórmula', () => {
+    const csv = service.paraCsv(['a', 'b'], [['=HYPERLINK("x")', 'tem;ponto']]);
+    expect(csv.startsWith('﻿a;b\r\n')).toBe(true);
+    expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
+    expect(csv).toContain('"tem;ponto"');
+  });
+
+  it('diário: uma linha por dia e parceria', async () => {
+    repo.porDia.mockResolvedValue([{ dia: '2026-11-06', parceria: 'clube-xyz', visitantes: 3, formularios: 1 }]);
+    const { nome, conteudo } = await service.exportarCsv({ dias: 30 });
+    expect(repo.porDia).toHaveBeenCalledWith(expect.any(Date), null, { separarParceria: true });
+    expect(nome).toBe('parcerias-diario-todas-30d.csv');
+    expect(conteudo.split('\r\n')[1]).toBe('2026-11-06;clube-xyz;3;;;;;;1;;;');
+  });
+});

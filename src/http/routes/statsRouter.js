@@ -1,6 +1,7 @@
 const express = require('express');
 const { validateJWT, requireAdmin } = require('../middlewares/auth');
 const ctrl = require('../controllers/statsController');
+const parcerias = require('../controllers/parceriaController');
 
 const router = express.Router();
 
@@ -108,6 +109,37 @@ router.get('/blog', ctrl.blog);
  *       200: { description: "Funil por lista, convertidos, taxa de conversão e novos leads por dia" }
  */
 router.get('/upgrades', ctrl.upgrades);
+
+/**
+ * @swagger
+ * /stats/parcerias:
+ *   get:
+ *     summary: Funil das parcerias do Assine Já (visitantes, consultas, formulários, WhatsApp)
+ *     tags: [Stats]
+ *     parameters:
+ *       - { in: query, name: dias, schema: { type: integer, default: 30, maximum: 365 } }
+ *       - { in: query, name: parceria, schema: { type: string }, description: Filtra uma parceria (slug) }
+ *     responses:
+ *       200:
+ *         description: "{ periodo, parceria, parcerias_conhecidas, totais, parcerias, serie_diaria, planos }"
+ */
+router.get('/parcerias', parcerias.resumo);
+
+/**
+ * @swagger
+ * /stats/parcerias/csv:
+ *   get:
+ *     summary: Exporta o funil das parcerias em CSV (abre direto no Excel/Sheets)
+ *     tags: [Stats]
+ *     parameters:
+ *       - { in: query, name: dias, schema: { type: integer, default: 30, maximum: 365 } }
+ *       - { in: query, name: parceria, schema: { type: string } }
+ *       - { in: query, name: tipo, schema: { type: string, enum: [diario, eventos], default: diario }, description: "diario = uma linha por dia e parceria; eventos = um evento por linha" }
+ *     responses:
+ *       200:
+ *         description: Arquivo CSV (separador ;)
+ */
+router.get('/parcerias/csv', parcerias.exportarCsv);
 
 /**
  * @swagger

@@ -462,3 +462,23 @@ model BlogAuditoria {
   @@index([criado_em])
   @@map("blog_auditoria")
 }
+
+// Funil das parcerias no Assine Já (?parceria=<slug>). Um registro por evento,
+// gravado pelo próprio navegador do visitante. Sem dado pessoal: nem nome, nem
+// celular, nem CEP — só o que o funil precisa para contar.
+model ParceriaEvento {
+  id        String   @id @default(uuid())
+  parceria  String   @db.VarChar(40) // slug normalizado: a-z, 0-9, - e _
+  evento    String   @db.VarChar(32) // allowlist em ParceriaService.EVENTOS
+  sessao    String   @db.VarChar(36) // id aleatório por aba (sessionStorage), conta visitantes únicos
+  plano     String?  @db.VarChar(32) // chave do plano no Assine Já (ex.: black800)
+  detalhe   String?  @db.VarChar(64) // resultado da etapa (ex.: com_planos, sem_cobertura, chat)
+  origem    String?  @db.VarChar(255) // URL de onde o visitante veio (document.referrer, só origem + caminho)
+  userAgent String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+
+  @@index([parceria, createdAt])
+  @@index([createdAt])
+  @@index([sessao])
+  @@map("parceria_eventos")
+}
