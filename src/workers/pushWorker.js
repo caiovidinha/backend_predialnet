@@ -19,12 +19,21 @@ pushQueue.process(20, async job => {
     logger.info(`✅ Job ${job.id}: envio concluído, ${tickets.length} tickets recebidos`);
 
     // 2) atualiza o registro no banco para "sent"
+    // `receipts` guarda só um resumo, não o array de tickets inteiro: numa
+    // campanha grande (milhares de destinatários) o array bruto virava uma
+    // coluna gigante nessa única linha, e paginar a tabela de campanhas
+    // (mesmo sem usar esse campo) já derrubou o MySQL por memória de sort.
+    // O detalhe por destinatário já está no PushDelivery.
+    const resumoTickets = tickets.reduce((acc, t) => {
+      acc[t.status === 'ok' ? 'ok' : 'error'] += 1;
+      return acc;
+    }, { ok: 0, error: 0 });
     await prisma.notification.update({
       where: { id: notificationId },
       data: {
         status: 'sent',
         tokens: messages.length,
-        receipts: tickets
+        receipts: resumoTickets
       }
     });
 
