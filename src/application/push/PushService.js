@@ -2,6 +2,7 @@ const { client } = require('../../prisma/client');
 const pushTokenRepo = require('../../infrastructure/repositories/pushTokenRepository');
 const notificationRepo = require('../../infrastructure/repositories/notificationRepository');
 const userNotifRepo = require('../../infrastructure/repositories/userNotificationRepository');
+const pushDeliveryRepo = require('../../infrastructure/repositories/pushDeliveryRepository');
 const pushQueue = require('../../queues/pushQueue');
 const { getAllUserCpfs, getClientsByAddress } = require('../utilities/UtilitiesService');
 const logger = require('../../utils/logger');
@@ -22,8 +23,9 @@ async function _enqueuePushForCpfs({ cpfs, title, body, data }) {
 
   const note = await notificationRepo.create({ title, body, data });
   await userNotifRepo.createMany(userIds, note.id);
+  await pushDeliveryRepo.createMany(tokens.map(({ token, userId }) => ({ notificationId: note.id, userId, token })));
 
-  const messages = tokens.map(({ token }) => ({ to: token, title, body, sound: 'default', data }));
+  const messages = tokens.map(({ token }) => ({ to: token, title, body, sound: 'default', data: { ...data, notificationId: note.id } }));
   await pushQueue.add({ messages, notificationId: note.id }, { attempts: 3, backoff: 5000 });
   return { queued: messages.length, notificationId: note.id };
 }
@@ -72,6 +74,15 @@ const getNotifications = async (cpf) => {
 
 const markNotificationRead = (id, read) => userNotifRepo.markRead(id, read);
 
+// Identificado por cpf (não por JWT): ENABLE_JWT está desligado em produção,
+// então validateJWT nunca popula req.userId — mesmo motivo pelo qual
+// savePushToken/getNotifications acima já recebem o cpf explícito.
+const markNotificationOpened = async (cpf, notificationId) => {
+  const user = await client.user.findUnique({ where: { cpf } });
+  if (!user) return; // não é erro do cliente — só não há o que marcar
+  await pushDeliveryRepo.markOpenedByUser(notificationId, user.id);
+};
+
 const sendBroadcast = async ({ title, body, data }) => {
   const allTokens = await pushTokenRepo.findAll();
   if (!allTokens.length) return { queued: 0 };
@@ -79,8 +90,9 @@ const sendBroadcast = async ({ title, body, data }) => {
   const note = await notificationRepo.create({ title, body, data });
   const userIds = allTokens.map(t => t.userId);
   await userNotifRepo.createMany(userIds, note.id);
+  await pushDeliveryRepo.createMany(allTokens.map(({ token, userId }) => ({ notificationId: note.id, userId, token })));
 
-  const messages = allTokens.map(({ token }) => ({ to: token, title, body, sound: 'default', data }));
+  const messages = allTokens.map(({ token }) => ({ to: token, title, body, sound: 'default', data: { ...data, notificationId: note.id } }));
   await pushQueue.add({ messages, notificationId: note.id }, { attempts: 3, backoff: 5000 });
   return { queued: messages.length, notificationId: note.id };
 };
@@ -113,8 +125,9 @@ const sendFiltered = async ({ title, body, data, filters }) => {
 
   const note = await notificationRepo.create({ title, body, data });
   await userNotifRepo.createMany(finalIds, note.id);
+  await pushDeliveryRepo.createMany(tokens.map(({ token, userId }) => ({ notificationId: note.id, userId, token })));
 
-  const messages = tokens.map(({ token }) => ({ to: token, title, body, sound: 'default', data }));
+  const messages = tokens.map(({ token }) => ({ to: token, title, body, sound: 'default', data: { ...data, notificationId: note.id } }));
   await pushQueue.add({ messages, notificationId: note.id }, { attempts: 3, backoff: 5000 });
   return { queued: messages.length, notificationId: note.id };
 };
@@ -155,6 +168,7 @@ module.exports = {
   savePushToken,
   getNotifications,
   markNotificationRead,
+  markNotificationOpened,
   sendBroadcast,
   sendFiltered,
   sendTargeted,

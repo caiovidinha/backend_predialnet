@@ -17,6 +17,7 @@ model User {
   show_ad           ShowAd?
   pushTokens        PushToken[]
   userNotifications UserNotification[]  // ← nova relação
+  pushDeliveries    PushDelivery[]
   email_change      EmailChange?
 
   // Anulável de propósito: quem já existia antes desta coluna não tem data de
@@ -102,10 +103,70 @@ model Notification {
   receipts           Json?              
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
-  userNotifications  UserNotification[] 
+  userNotifications  UserNotification[]
+  deliveries         PushDelivery[]
 
   @@index([createdAt])
   @@map("notifications")
+}
+
+// Rastreio por destinatário de um envio de push — 1 linha por (notification,
+// user, token). Existe pra parear notificação↔destinatário↔ticket Expo de
+// forma confiável (antes só se sabia o agregado em Notification.receipts) e
+// pra alimentar as telas de monitoramento (painel de avisos) e saúde.
+enum PushDeliveryStatus {
+  pending   // criado, job ainda não processou
+  sent      // Expo aceitou o ticket (ticket.status === 'ok')
+  delivered // receipt confirmou entrega (receipt.status === 'ok')
+  failed    // ticket.status === 'error' ou receipt.status === 'error'
+}
+
+model PushDelivery {
+  id             String             @id @default(uuid())
+  notification   Notification       @relation(fields: [notificationId], references: [id])
+  notificationId String
+  user           User               @relation(fields: [userId], references: [id])
+  userId         String
+  token          String // snapshot — sobrevive se o PushToken for apagado depois (ex. DeviceNotRegistered)
+  status         PushDeliveryStatus @default(pending)
+  ticketId       String? // id do ticket Expo — só gravado nos casos de erro, ver pushWorker.js
+  errorCode      String? // código da Expo (ex. DeviceNotRegistered) ou mensagem do ticket; sem enum de propósito, é definido pela Expo
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  openedAt       DateTime? // usuário tocou no push (reportado pelo app) — distinto de UserNotification.readAt (leu na lista do app)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([notificationId])
+  @@index([userId])
+  @@index([notificationId, status])
+  @@map("push_deliveries")
+}
+
+// Snapshot periódico de saúde dos sistemas (Redis, banco, fila, processo,
+// pm2, tamanho de logs), gravado pelo HealthScheduler. Dá histórico/tendência
+// além do estado "agora" exposto por GET /admin/health.
+model HealthSnapshot {
+  id             String   @id @default(uuid())
+  redisOk        Boolean
+  redisMs        Float?
+  dbOk           Boolean
+  dbMs           Float?
+  queueWaiting   Int?
+  queueActive    Int?
+  queueCompleted Int?
+  queueFailed    Int?
+  queueDelayed   Int?
+  memRssMb       Float?
+  memHeapUsedMb  Float?
+  uptimeS        Int?
+  pm2            Json? // [{nome,status,restarts,memMb,cpu,uptimeMs}]
+  logFiles       Json? // [{arquivo,tamanhoMb}] — só os acima do limiar de alerta
+  alerts         Json? // string[] com os problemas detectados nesse snapshot
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("health_snapshots")
 }
 
 model UserMetadata {

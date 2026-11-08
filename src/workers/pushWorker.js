@@ -4,6 +4,7 @@ const pushQueue = require('../queues/pushQueue');
 const { sendPushNotifications, getPushNotificationReceipts } = require('../services/expoPushService');
 const { PrismaClient } = require('@prisma/client');
 const { deleteByToken } = require('../infrastructure/repositories/pushTokenRepository');
+const pushDeliveryRepo = require('../infrastructure/repositories/pushDeliveryRepository');
 const logger = require('../utils/logger');
 const prisma = new PrismaClient();
 
@@ -27,6 +28,29 @@ pushQueue.process(20, async job => {
       }
     });
 
+    // 2.1) marca PushDelivery por destinatário — só quando o pareamento por
+    // índice é confiável (mesma condição usada pra limpeza de token abaixo).
+    // Agrupado por status/mensagem de erro em vez de 1 update por linha: um
+    // broadcast GLOBAL com milhares de tokens gera só um punhado de updateMany.
+    if (tickets.length === messages.length) {
+      const okTokens = [];
+      const falhasPorMensagem = new Map();
+      tickets.forEach((t, i) => {
+        if (t.status === 'ok') okTokens.push(messages[i].to);
+        else {
+          const chave = t.message || 'erro desconhecido';
+          if (!falhasPorMensagem.has(chave)) falhasPorMensagem.set(chave, []);
+          falhasPorMensagem.get(chave).push(messages[i].to);
+        }
+      });
+      if (okTokens.length) await pushDeliveryRepo.markSentBulk(notificationId, okTokens);
+      for (const [mensagem, tokensComErro] of falhasPorMensagem) {
+        await pushDeliveryRepo.markFailedBulk(notificationId, tokensComErro, mensagem);
+      }
+    } else {
+      logger.warn(`⚠️  Job ${job.id}: pareamento tickets/mensagens inconsistente — PushDelivery segue 'pending'`);
+    }
+
     // 3) busca receipts detalhados e limpa tokens inválidos
     const receiptIds = tickets.map(t => t.id).filter(Boolean);
     if (receiptIds.length) {
@@ -44,6 +68,23 @@ pushQueue.process(20, async job => {
       }
 
       const receipts = await getPushNotificationReceipts(receiptIds);
+
+      // 3.1) marca PushDelivery por receipt — mesma lógica de agrupamento,
+      // dessa vez por ticketId (não precisa resolver token aqui).
+      const gruposPorChave = new Map(); // "ok" | "error:<detail>" -> ticketIds[]
+      for (const [ticketId, result] of Object.entries(receipts)) {
+        const chave = result.status === 'ok' ? 'ok' : `error:${result.details?.error || 'desconhecido'}`;
+        if (!gruposPorChave.has(chave)) gruposPorChave.set(chave, []);
+        gruposPorChave.get(chave).push(ticketId);
+      }
+      for (const [chave, ticketIdsDoGrupo] of gruposPorChave) {
+        if (chave === 'ok') {
+          await pushDeliveryRepo.markDeliveredBulkByTicket(ticketIdsDoGrupo);
+        } else {
+          await pushDeliveryRepo.markFailedBulkByTicket(ticketIdsDoGrupo, chave.slice('error:'.length));
+        }
+      }
+
       for (const [ticketId, result] of Object.entries(receipts)) {
         if (result.status !== 'error' || result.details?.error !== 'DeviceNotRegistered') continue;
 
@@ -78,6 +119,7 @@ pushQueue.on('failed', async (job, err) => {
       where: { id: notificationId },
       data: { status: 'failed' }
     });
+    await pushDeliveryRepo.markAllPendingFailed(notificationId);
     logger.info(`🔄 Notification ${notificationId} marcada como failed`);
   } catch (dbErr) {
     logger.error(`💥 Erro ao atualizar status da notification ${notificationId}: ${dbErr.message}`, { stack: dbErr.stack });

@@ -87,6 +87,18 @@ const markReadController = async (req, res) => {
   }
 };
 
+const markOpenedController = async (req, res) => {
+  const { cpf, notificationId } = req.body;
+  if (!cpf || !notificationId) return res.status(400).json({ error: 'cpf e notificationId são obrigatórios' });
+  try {
+    await pushService.markNotificationOpened(cpf, notificationId);
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    logger.error('markOpened error', { error: err.message });
+    return res.status(500).json({ error: 'Erro interno' });
+  }
+};
+
 const sendTargetedController = async (req, res) => {
   const { title, body, data, targets } = req.body;
   if (!title || !body) return res.status(400).json({ error: 'Os campos title e body são obrigatórios.' });
@@ -144,6 +156,6 @@ const sendByAddressController = async (req, res) => {
 
 module.exports = {
   saveTokenController, sendNotificationController, sendFilteredNotificationsController,
-  webhookController, getNotificationsController, markReadController,
+  webhookController, getNotificationsController, markReadController, markOpenedController,
   sendTargetedController, sendByAddressController,
 };

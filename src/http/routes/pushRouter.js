@@ -7,6 +7,7 @@
 const express = require('express');
 const ctrl = require('../controllers/pushController');
 const { validateJWT } = require('../middlewares/auth');
+const { requireAdminToken } = require('../middlewares/adminAuth');
 
 const router = express.Router();
 
@@ -132,6 +133,39 @@ router.get('/notifications/:cpf', validateJWT, ctrl.getNotificationsController);
  *         description: Erro interno
  */
 router.patch('/notifications/:id/read', validateJWT, ctrl.markReadController);
+
+/**
+ * @swagger
+ * /push/notifications/opened:
+ *   post:
+ *     summary: Reporta que o usuário tocou numa notificação push (abertura)
+ *     tags: [Push]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - cpf
+ *               - notificationId
+ *             properties:
+ *               cpf:
+ *                 type: string
+ *               notificationId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Abertura registrada
+ *       400:
+ *         description: cpf ou notificationId não fornecido
+ *       500:
+ *         description: Erro interno
+ */
+// Sem validateJWT de propósito: ENABLE_JWT está desligado em produção, então
+// validateJWT nunca popularia req.userId — identifica por cpf no body, igual
+// a /push/save-token acima.
+router.post('/notifications/opened', ctrl.markOpenedController);
 
 /**
  * @swagger
@@ -296,7 +330,7 @@ router.post('/webhook', ctrl.webhookController);
  *       500:
  *         description: Erro interno
  */
-router.post('/send-targeted', ctrl.sendTargetedController);
+router.post('/send-targeted', requireAdminToken, ctrl.sendTargetedController);
 
 /**
  * @swagger
@@ -344,6 +378,6 @@ router.post('/send-targeted', ctrl.sendTargetedController);
  *       500:
  *         description: Erro interno
  */
-router.post('/send-by-address', ctrl.sendByAddressController);
+router.post('/send-by-address', requireAdminToken, ctrl.sendByAddressController);
 
 module.exports = router;
