@@ -26,6 +26,7 @@ const statsRouter = require('./http/routes/statsRouter');
 const parceriaRouter = require('./http/routes/parceriaRouter');
 const pushAdminRouter = require('./http/routes/pushAdminRouter');
 const healthRouter = require('./http/routes/healthRouter');
+const logsRouter = require('./http/routes/logsRouter');
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use('/stats', statsRouter);
 app.use('/parcerias', parceriaRouter);
 app.use('/admin/push', pushAdminRouter);
 app.use('/admin/health', healthRouter);
+app.use('/admin/logs', logsRouter);
 app.use('/', ehClienteRouter);
 
 app.get('/docs', swaggerAuthMiddleware, (req, res, next) => {

@@ -1,13 +1,10 @@
 const os = require('os');
-const fs = require('fs');
 const { exec } = require('child_process');
 const Redis = require('ioredis');
 const { client: prisma } = require('../../prisma/client');
 const pushQueue = require('../../queues/pushQueue');
+const logsService = require('./LogsService');
 
-// Caminho fixo nesse servidor (pm2 roda como root). Configurável porque é a
-// única parte deste serviço que depende de onde o pm2 guarda os logs.
-const LOG_DIR = process.env.PM2_LOG_DIR || '/root/.pm2/logs';
 const LOG_SIZE_ALERT_MB = Number.parseInt(process.env.HEALTH_LOG_SIZE_ALERT_MB, 10) || 50;
 
 // Ping direto via ioredis, não via Bull — precisa detectar Redis caído mesmo
@@ -81,12 +78,7 @@ const medirPm2 = () => new Promise((resolve) => {
 // com o pushWorker-error.log antes desse serviço existir.
 const medirLogs = () => {
   try {
-    const arquivos = fs.readdirSync(LOG_DIR)
-      .filter(f => f.endsWith('.log'))
-      .map(f => {
-        const stat = fs.statSync(`${LOG_DIR}/${f}`);
-        return { arquivo: f, tamanhoMb: stat.size / 1024 / 1024 };
-      })
+    const arquivos = logsService.listarArquivos()
       .filter(f => f.tamanhoMb >= 1)
       .sort((a, b) => b.tamanhoMb - a.tamanhoMb);
     return { ok: true, arquivos };

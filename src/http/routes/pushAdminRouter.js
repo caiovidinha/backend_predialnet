@@ -69,6 +69,10 @@ router.get('/campaigns/:id', ctrl.getCampaign);
  *       - in: query
  *         name: status
  *         schema: { type: string, enum: [pending, sent, delivered, failed] }
+ *       - in: query
+ *         name: cpf
+ *         schema: { type: string }
+ *         description: Filtra por CPF (com ou sem pontuação) — busca por conter os dígitos.
  *     responses:
  *       200:
  *         description: Lista paginada de destinatários

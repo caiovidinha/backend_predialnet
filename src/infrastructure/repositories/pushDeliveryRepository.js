@@ -44,17 +44,26 @@ const aggregateForNotification = async (notificationId) => {
   return base;
 };
 
-const listByNotification = (notificationId, { skip, take, status }) =>
+// `cpf` busca por conter os dígitos informados (a pessoa pode digitar com ou
+// sem pontuação) — não precisa ser o CPF inteiro, mas a tela mascara o
+// resultado de qualquer forma: isso só é útil pra quem já sabe o CPF.
+const whereDelivery = (notificationId, { status, cpf }) => ({
+  notificationId,
+  ...(status ? { status } : {}),
+  ...(cpf ? { user: { cpf: { contains: cpf } } } : {}),
+});
+
+const listByNotification = (notificationId, { skip, take, status, cpf }) =>
   client.pushDelivery.findMany({
-    where: { notificationId, ...(status ? { status } : {}) },
+    where: whereDelivery(notificationId, { status, cpf }),
     include: { user: { select: { cpf: true } } },
     orderBy: { createdAt: 'asc' },
     skip,
     take,
   });
 
-const countByNotification = (notificationId, { status }) =>
-  client.pushDelivery.count({ where: { notificationId, ...(status ? { status } : {}) } });
+const countByNotification = (notificationId, { status, cpf }) =>
+  client.pushDelivery.count({ where: whereDelivery(notificationId, { status, cpf }) });
 
 module.exports = {
   createMany,

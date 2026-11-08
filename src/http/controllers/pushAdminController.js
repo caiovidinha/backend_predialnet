@@ -54,10 +54,14 @@ const listDeliveries = async (req, res) => {
   const { id } = req.params;
   const { page, limit, skip, take } = paginar(req);
   const status = STATUS_VALIDOS.includes(req.query.status) ? req.query.status : undefined;
+  // Tira pontuação pra casar com o CPF salvo (dígitos), independente de como
+  // a pessoa digitou (com ou sem pontos/traço) na busca do painel.
+  const cpfRaw = typeof req.query.cpf === 'string' ? req.query.cpf.replace(/\D/g, '') : '';
+  const cpf = cpfRaw || undefined;
   try {
     const [rows, total] = await Promise.all([
-      pushDeliveryRepo.listByNotification(id, { skip, take, status }),
-      pushDeliveryRepo.countByNotification(id, { status }),
+      pushDeliveryRepo.listByNotification(id, { skip, take, status, cpf }),
+      pushDeliveryRepo.countByNotification(id, { status, cpf }),
     ]);
     const items = rows.map(d => ({
       id: d.id,
